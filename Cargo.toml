@@ -5,4 +5,5 @@ edition = "2021"
 
 [dependencies]
 bincode = "1"
+lzw = "0.10"
 serde = { version = "1", features = ["derive"] }

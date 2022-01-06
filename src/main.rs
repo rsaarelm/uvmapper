@@ -1,4 +1,5 @@
 use std::{
+    collections::HashMap,
     env, fmt,
     fs::{self, File},
     io::{prelude::*, BufReader},
@@ -7,6 +8,20 @@ use std::{
 };
 
 use serde::{Deserialize, Serialize};
+
+fn unpack_lzw(mut bytes: &[u8]) -> Vec<u8> {
+    let mut decoder = lzw::Decoder::new(lzw::LsbReader::new(), 8);
+    let mut ret = Vec::new();
+    loop {
+        let (len, unpacked) = decoder.decode_bytes(bytes).unwrap();
+        if len == 0 {
+            break;
+        }
+        ret.extend_from_slice(unpacked);
+        bytes = &bytes[len..];
+    }
+    ret
+}
 
 #[rustfmt::skip]
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
@@ -411,6 +426,36 @@ impl fmt::Display for DungeonFloor {
     }
 }
 
+// Bitpos: &[u8], usize bit offse
+
+fn lzw_decode(data: &[u8]) -> Vec<u8> {
+    struct BitCursor<'a> {
+        data: &'a [u8],
+        bit_offset: usize,
+    }
+
+    impl<'a> BitCursor<'a> {
+        pub fn read(&mut self, nbits: usize) -> u32 {
+            debug_assert!(nbits > 0 && nbits < 16);
+            let mut n = *self.data.get(0).unwrap_or(&0) as u32
+                + (*self.data.get(1).unwrap_or(&0) as u32)
+                << 8 + (*self.data.get(2).unwrap_or(&0) as u32)
+                << 16;
+            n >>= self.bit_offset;
+
+            self.bit_offset += nbits;
+            while self.bit_offset >= 8 {
+                self.bit_offset -= 8;
+                self.data = &self.data[1..];
+            }
+
+            n & ((1 << nbits) - 1)
+        }
+    }
+
+    todo!();
+}
+
 fn main() {
     let path: PathBuf = env::var("ULTIMA_V_PATH")
         .expect("Set environment variable ULTIMA_V_PATH to point to data files")
@@ -440,6 +485,20 @@ fn main() {
         println!("--------\n");
     }
 
-    let tiles = fs::read(path.join("TILES.16")).unwrap();
-    // TODO: Decompress
+    // First four bytes are expected output length, skip.
+    let tiles = unpack_lzw(&fs::read(path.join("TILES.16")).unwrap()[4..]);
+    let tiles: Vec<u8> =
+        tiles.into_iter().flat_map(|b| [b >> 4, b & 0xf]).collect();
+
+    for y in 0..(512 * 16) {
+        for x in 0..16 {
+            let mut b = tiles[y * 16 + x];
+            if b == 0 {
+                print!(" ");
+            } else {
+                print!("{}", char::from_digit(b as u32, 16).unwrap());
+            }
+        }
+        println!();
+    }
 }
