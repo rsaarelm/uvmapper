@@ -1,0 +1,2167 @@
+   Link: edit: Edit
+   Link: license
+
+                           Ultima V internal formats
+
+   From Ultima Codex
+   Jump to navigationJump to search
+This article is a stub. You can help the Codex of Ultima Wisdom by expanding it.
+
+   This text is copied and pasted from "Nodling's".
+
+Contents
+
+     * 1 LZW compressed
+          * 1.1 Graphics files (*.4 and *.16 extensions)
+          * 1.2 "tiles.4" and "tiles.16"
+          * 1.3 All other *.4 and *.16 files
+     * 2 *.CBT
+          * 2.1 File Format
+          * 2.2 Information field in the Map_Row
+          * 2.3 Example of a dungeon room
+          * 2.4 Tiles for each monster
+          * 2.5 Combat maps
+               * 2.5.1 BRIT.CBT
+               * 2.5.2 DUNGEON.CBT
+     * 3 *.CH
+     * 4 *.DAT
+          * 4.1 BRIT.DAT
+          * 4.2 CASTLE.DAT
+          * 4.3 DUNGEON.DAT
+          * 4.4 TOWNE.DAT
+          * 4.5 DWELLING.DAT
+          * 4.6 KEEP.DAT
+          * 4.7 LOOK2.DAT
+          * 4.8 MISCMAPS.DAT
+               * 4.8.1 Cutscene Maps
+               * 4.8.2 Intro Maps
+          * 4.9 SIGNS.DAT
+          * 4.10 UNDER.DAT
+          * 4.11 SHOPPE.DAT
+     * 5 *.HCS
+     * 6 *.NPC
+          * 6.1 CASTLE.NPC
+          * 6.2 DWELLING.NPC
+          * 6.3 KEEP.NPC
+          * 6.4 TOWNE.NPC
+               * 6.4.1 Values for the dialog_number
+     * 7 *.OVL
+          * 7.1 DATA.OVL
+          * 7.2 The other OVL
+     * 8 *.TLK
+          * 8.1 The text encoding
+               * 8.1.1 First part: fixed entries
+               * 8.1.2 Second part: key words
+               * 8.1.3 Third part : labels
+               * 8.1.4 Generalities
+     * 9 General Notes
+     * 10 EGA.DRV
+     * 11 INIT.GAM
+     * 12 SAVED.GAM
+          * 12.1 ===================
+     * 13 Sources
+
+                              LZW compressed[edit]
+
+   Some files from the PC version of Ultima V have been compressed with the
+   LZW algorithm:
+
+     * .4
+     * .16
+
+   (and possibly others)
+
+   The compressed files are stored as (uint32 uncompressedLength, uint8[]
+   compressedData).
+
+Graphics files (*.4 and *.16 extensions)[edit]
+
+   These are all LZW-compressed image files. Those with a .4 extension have
+   four-colour, two-bit data; those with a .16 extension have 16-colour,
+   four-bit data.
+
+   Pixels are stored in descending bit order. So for a 16-color byte the
+   first pixel is mask 0xF0, and the second is mask 0x0F. For a 4-color byte,
+   the first pixel is mask 0xC0, the second pixel is mask 0x30, the third
+   pixel is mask 0x0C, and the fourth pixel is mask 0x03.
+
+   Rows of pixels are padded to a four-pixel (byte) boundary for 4-color
+   data, and an eight-pixel (four byte) boundary for 16-color data. So for a
+   given width in pixels, a 4-color row is ((width + 3) / 4) bytes long,
+   while a 16-color row is ((width + 7) / 8 * 4) bytes long.
+
+"tiles.4" and "tiles.16"[edit]
+
+   These files, when uncompressed, contain 512 (0x200) tiles that are each
+   16x16 pixels stored in order without any headers. Using the above rules,
+   the 4-color rows are stored as 4 bytes per row, and the 16-color rows are
+   8 bytes per row.
+
+   The 16-color tile sets are :
+
+   PC:
+
+   Ultima 5 - Tiles-pc.png
+
+   Amiga:
+
+   Ultima 5 - Tiles.png
+
+   Here is the 4-color tileset using a gray-scale scheme with this file:
+
+   Ultima Tiles 4 grayscale.png
+
+All other *.4 and *.16 files[edit]
+
+   These LZW-compressed files are composed of a number of images of varying
+   sizes. The header is (uint16 count, uint32[count] offsets), where count is
+   the number of images, and offsets is the start of an image from the
+   beginning of the file, or zero if there is no image in that slot (this
+   only occurs in "dng*.16" files).
+
+   Each image is composed of (uint16 width, uint16 height, ImageRow[height]
+   data). Each row has the number of bytes discussed above.
+
+   "items.*" and "mon*.*" contain dungeon ladders, chests, and monster
+   graphics, and have an additional twist:
+
+     * The offsets are actually in uint16 and not uint32
+     * Immediately following the image data is an image mask, composed of
+       (uint16 width, uint16 height, uint8[(width + height + 7) / 8] data);
+       width and height must be identical to those in the image. Pixels are
+       stored in descending bit order with no padding, so the first pixel is
+       mask 0x80, the second pixel is mask 0x40, and so on. If a value is
+       set, then that pixel is masked and should not be drawn.
+
+                                  *.CBT[edit]
+
+   The combat files define a series of combat maps that are 11 x 11 in size.
+
+File Format[edit]
+
+ struct CBT_File {
+   Combat_Map c_maps[n];
+ };
+
+                                CBT File Format
+   Offset Length (in bytes) Purpose 
+   0x0    352               Map 1   
+   0x160  352               Map 2   
+   ...    ...               Rest    
+
+                                   Combat Map
+   Offset Length (in bytes) Purpose                
+   0x0    32                Map_Row 1              
+   0x20   32                Map_Player_Pos_Row 2   
+   0x40   32                Map_Player_Pos_Row 3   
+   0x60   32                Map_Player_Pos_Row 4   
+   0x80   32                Map_Player_Pos_Row 5   
+   0xA0   32                Map_Monster_Tile_Row 6 
+   0xC0   32                Map_Monster_X_Row 7    
+   0xF0   32                Map_Monser_Y_Row 8     
+   0x100  32                Map_Trigger_Pos 9      
+   0x120  32                Map_New_Tile_X 10      
+   0x140  32                Map_New_Tile_Y 11      
+
+ struct Combat_Map {
+   Map_Row              row0[1];  //Information contains the new tiles once a trigger happens 
+
+   // row 1 = east
+   // row 2 = west
+   // row 3 = south
+   // row 4 = north
+   Map_PlayerPos_Row    row1_4[4];
+   Map_MonsterTile_Row  row5[1];
+   Map_MonsterX_Row     row6[1];
+   Map_MonsterY_Row     row7[1];
+
+   // row 8: positions of triggers, one position hits to new tiles
+   // row 9: position X of the new tiles
+   // row 10: position Y of the new tiles
+   Map_Row              row8_10[3];  
+ };
+
+                                    Map Row
+   Offset Length (in bytes) Purpose                 
+   0x0    11                Tile Data               
+   0xB    8                 New tiles after trigger 
+   0x13   13                Padding                 
+
+ struct Map_Row {
+   uint8 tiles[11];
+   uint8 newTiles[8];
+   uint8 padding[13];
+ };
+
+                               Map_PlayerPos_Row
+   Offset Length (in bytes) Purpose                                   
+   0x0    11                Tile Data                                 
+   0xB    6                 Initial X Positions for each Party Member 
+   0x11   6                 Initial Y Positions for each Party Member 
+   0x17   9                 Padding                                   
+
+ struct Map_PlayerPos_Row {
+   uint8 tiles[11];
+   uint8 initial_X[6]; // initial x position of each party member
+   uint8 initial_Y[6]; // initial y position of each party member
+   uint8 zeroes[9] = {0,0,0,0,0,0,0,0,0};
+ };
+
+                              Map_MonsterTile_Row
+   Offset Length (in bytes) Purpose      
+   0x0    11                Tile Data    
+   0xB    16                Monster Tile 
+   0x1B   5                 Zero Padding 
+
+ struct Map_MonsterTile_Row {
+   uint8 tiles[11];
+   uint8 monster_tiles[16]; // tile for each monster
+   uint8 zeroes[5] = {0,0,0,0,0};
+ };
+
+                                Map_MonsterX_Row
+   Offset Length (in bytes) Purpose                            
+   0x0    11                Tile Data                          
+   0xB    16                Initial X Position of each Monster 
+   0x1B   5                 Zero Padding                       
+
+ struct Map_MonsterX_Row {
+   uint8 tiles[11];
+   uint8 initial_X[16]; // initial x position of each monster
+   uint8 zeroes[5] = {0,0,0,0,0};
+ };
+
+                                Map_MonsterY_Row
+   Offset Length (in bytes) Purpose                            
+   0x0    11                Tile Data                          
+   0xB    16                Initial Y Position of each Monster 
+   0x1B   5                 Zero Padding                       
+
+ struct Map_MonsterY_Row {
+   uint8 tiles[11];
+   uint8 initial_Y[16]; // initial y position of each monster
+   uint8 zeroes[5] = {0,0,0,0,0};
+ };
+
+   Notes:
+
+     * Certain fields are explained in the next couple of sections
+     * The initial party member positions depend on the direction from which
+       the party entered the map.
+
+Information field in the Map_Row[edit]
+
+   The information field has different meanings depending on the considered
+   row. The information relates to map changes that happen when a character
+   moves onto a tile.
+
+     * The position of the tiles are provided in row 8 where the 16 bytes of
+       information are divided into two 8-byte sections (X position and Y
+       position)
+     * The type of tiles are obtained in row 0
+     * The position of the triggers is provided in rows 9 and 10. Row 9
+       provides the X position, row 10 provides the Y position.
+
+   It seems that one trigger automatically changes two tiles.
+
+Example of a dungeon room[edit]
+
+   Here is an example of a dungeon room entirely decoded.
+
+ #Level 1
+ FF 4F 44 44 44 44 44 4F FF FF FF
+ #New tiles for the changes
+ 4F 4F 4F 44 44 44 44 44
+ #Unknown
+ 00 00 00 00 00 00 00 00
+ #Unkown
+ 00 00 00 00 00
+
+ #Level 2
+ FF 4F 44 44 44 44 44 4F 4F 4F 4F
+ #Position X (east)
+ 08 09 09 0A 0A 0A
+ #Position Y (east)
+ 04 03 05 04 02 06
+ #Unkown
+ 00 00 00 00 00 00 00 00 00
+
+ #Level 3
+ FF 4F 44 44 44 44 44 44 44 44 44
+ #Position X (west)
+ 00 00 00 00 00 00
+ #Position Y (west)
+ 00 00 00 00 00 00
+ #Unkown
+ 00 00 00 00 00 00 00 00 00
+
+ #Level 4
+ FF 4F 4F 44 44 44 44 44 44 44 44
+ #Position X (south)
+ 04 05 03 04 06 02
+ #Position Y (south)
+ 08 09 09 0A 0A 0A
+ #Unkown
+ 00 00 00 00 00 00 00 00 00
+
+ #Level 5
+ FF FF 4F 4F 44 44 44 44 44 44 44
+ #Position X (north)
+ 04 03 05 04 02 06
+ #Position Y (north)
+ 02 01 01 00 00 00
+ #Unkown
+ 00 00 00 00 00 00 00 00 00
+
+ #Level 6
+ FF FF FF 4F 44 44 44 44 44 44 44
+ #Monster tiles (what monsters are in the room)
+ DC D0 D0 D0 94 94 94 94 DC 00 00 00 00 00 00 00
+ #Unkown
+ 00 00 00 00 00
+
+ #Level 7
+ FF FF 4F 4F 44 44 44 44 44 44 44
+ #Initial X position for monsters
+ 09 02 01 01 01 01 01 01 09 00 00 00 00 00 00 00
+ #Unkown
+ 00 00 00 00 00
+
+ #Level 8
+ FF 4F 4F 44 44 44 44 44 44 46 46
+ #Initial Y position for monsters
+ 09 05 04 06 05 05 05 05 08 00 00 00 00 00 00 00
+ #Unkown
+ 00 00 00 00 00
+
+ #Level 9
+ FF 4F 44 44 44 44 44 44 46 44 46
+ #Position X of trigger for 2 elements of level 1, positions are in level 10 and level 11
+ 06 06 06 06 06 06 06 06
+ #Position Y of trigger for 2 elements of level 1, positions are in level 10 and level 11
+ 06 06 06 06 06 06 06 06
+ #Unknown
+ 00 00 00 00 00
+
+ #Level 10
+ FF 4F 44 44 44 44 44 46 44 44 46
+ #Position X of changes in map from trigger in Level 9
+ 00 00 00 01 01 02 02 03
+ #Position Y of changes in map from trigger in Level 9
+ 03 05 07 04 06 04 06 05
+ #Unkown
+ 00 00 00 00 00
+
+ #Level 11
+ FF 4F 44 44 44 44 44 46 46 46 46
+ #Position X of changes in map from trigger in Level 9
+ 00 00 00 01 02 03 03 03
+ #Position Y of changes in map from trigger in Level 9
+ 04 06 06 05 05 04 06 05
+ #Unknown
+ 00 00 00 00 00
+
+Tiles for each monster[edit]
+
+   In the case of dungeon maps, the tile for each monster gives the engine
+   which monster to load where. With the initial_X and initial_Y fields of
+   the Map_MonsterX_Row or Map_MonsterY_Row, the system can load up any
+   dungeon map with a maximum of 16 monsters in a given room.
+
+   The values of the the monster_tile array in the Map_MonsterTile_Row
+   element coincide with the elements of the tile set. However, since we are
+   considering monsters the first 256 tiles are ignored.
+
+   Thus 1 is a chest, 2 is gold, 3 is a potion, etc.
+
+   Notes:
+
+     * For some reason, certain values provide unexpected results
+          * 5C would normally be the bard but is the jocker instead
+          * EC, ED, EE, and EF seem to be a random monster value
+     * Though the system seems to use the first frame of each element, any
+       frame seems to work indifferently:
+          * 0x78 is Blackthorn but so is: 0x79, 0x7A, and 0x7B
+
+Combat maps[edit]
+
+  BRIT.CBT[edit]
+
+   Combat zone 0 Combat zone 1 Combat zone 2 Combat zone 3 Combat zone 4
+   Combat zone 5 Combat zone 6 Combat zone 7 Combat zone 8 Combat zone 9
+   Combat zone 10 Combat zone 11 Combat zone 12 Combat zone 13 Combat zone 14
+   Combat zone 15
+
+  DUNGEON.CBT[edit]
+
+                                   *.CH[edit]
+
+   Font files with 128 characters each: - ibm.ch contains the Latin
+   characters and a number of symbols. - runes.ch contains the Britannian
+   runes and the remaining symbols.
+
+   File format:
+
+   Each character is 8x8 pixels, 1 bit per pixel (0 = black, 1 = white). I
+   don't know which palette index is associated with a 0 or 1. Each byte
+   represents 8 pixels. The most significant bit represents the leftmost
+   pixel, and the least significant bit represents the rightmost pixel.
+
+                                  *.DAT[edit]
+
+BRIT.DAT[edit]
+
+   The Britannian map. Its size is 256x256 tiles. It is divided into 256
+   chunks. Each chunk has a size of 16x16 tiles, and each tile is stored as a
+   uint8 (in Ultima IV, the chunk size was 32x32 tiles).
+
+   To save space, chunks that are all water (tile 0x1) were left out. The
+   location of the all-water chunks is stored in DATA.OVL. The chunks are
+   stored from west to east, north to south, i.e. the first chunk in the
+   uncompressed map is the one in the northwest corner.
+
+   The tiles in a chunk are also stored from west to east, north to south.
+
+   The complete map of Britannia is:
+
+   U5brit.gif
+
+   The complete map of Britannia with the original tileset is: [1]
+
+CASTLE.DAT[edit]
+
+   The castle file contains all the maps concerning the castles.
+
+     * Lord British's Castle
+
+   Lord British's Castle – level -1 Lord British's Castle – level 1 Lord
+   British's Castle – Level 2 Lord British's Castle – level 3 Lord British's
+   Castle – level 4
+
+     * Blackthorn's Castle
+
+   Blackthorn’s Castle – level -1 Blackthorn’s Castle – level 1 Blackthorn’s
+   Castle – level 2 Blackthorn’s Castle – level 3 Blackthorn’s Castle – level
+   4
+
+     * Britannys
+
+   West Britanny North Britanny East Britanny
+
+     * Small towns
+
+   Paws Cove Buccaneer's Den
+
+DUNGEON.DAT[edit]
+
+   The DUNGEON.DAT file contains the dungeon maps for the game. It is made of
+   8 * 8 * 8 * 8 tiles where :
+
+     * The first 8 is a line of Deceit
+     * The first 8 * 8 is the first level of Deceit
+     * The first 8 * 8 * 8 is the dungeon Deceit, each level being 8 * 8
+
+   The code for each tile is actually divided in two groups of 4-bits:
+
+   Higher 4 bits:
+
+     * 0: Nothing
+     * 1: Ladder Up
+          * Lower bit: 8 provides an upper trap
+     * 2: Ladder Down
+          * Lower bit: 8 provides an upper trap
+     * 3: Ladder Up and Down
+          * Lower bit: 8 provides an upper trap
+     * 4: Chest
+          * Lower bits:
+               * 0: normal chest
+               * 1, 2: trapped
+               * 4: poisonned
+     * 5: Fountain
+          * Lower bits:
+               * 0: cure poison
+               * 1: heal
+               * 2: poison
+               * anything else: bad taste, damage
+     * 6: Trap
+          * Lower bits:
+               * 0: lower trap visible
+               * 1: bomb trap
+               * 2: invisible trap
+               * 8: upper trap visible
+     * 7: Open chest
+     * 8: Energy fields
+          * Lower 3 bits:
+               * 0: Poison
+               * 1: Sleep
+               * 2: Fire
+               * 3: Energy
+     * A: Rooms but doesn't seem to work when loading them
+     * B: Wall
+          * Lower values:
+               * 1: Text
+     * C: Secondary wall
+     * D: Secret door
+     * E: Normal door
+     * F: Room
+
+   Note :
+
+     * 4th lower bit says if there is an upper trap or not
+
+TOWNE.DAT[edit]
+
+   This data file contains the cities of Ultima 5:
+
+     * Moonglow
+
+   Moonglow 1 Moonglow 2
+
+     * Britain
+
+   Britain 1 Britain 2
+
+     * Jhelom
+
+   Jhelom 1 Jhelom 2
+
+     * Yew
+
+   Yew 1 Yew 2
+
+     * Minoc
+
+   Minoc 1 Minoc 2
+
+     * Trinsic
+
+   Trinsic 1 Trinsic 2
+
+     * Skara Brae
+
+   Skara Brae 1 Skara Brae 2
+
+     * New Magincia
+
+   New Magincia 1 New Magincia 2
+
+DWELLING.DAT[edit]
+
+   The dwelling data contains the various dwellings of the game.
+
+     * Fogsbane
+
+   Fogsbane (1) Fogsbane (2) Fogsbane (3)
+
+     * Stormcrow
+
+   Stormcrom (1) Stormcrom (2) Stormcrom (3)
+
+     * Greyhaven
+
+   Greyhaven (1) Greyhaven (2) Greyhaven (3)
+
+     * Waveguide
+
+   Waveguide (1) Waveguide (2) Waveguide (3)
+
+     * Iolo's hut
+
+   Iolo's hut
+
+     * Spektran
+
+   Spektran
+
+     * Sin'Vraal's hut
+
+   Sin Vraal's hut
+
+     * Grendel’s hut
+
+   Grendel's hut
+
+KEEP.DAT[edit]
+
+   The keep data contains the various keeps of the game.
+
+     * Ararat
+
+   Ararat (1) Ararat (2)
+
+     * Bordermarch
+
+   Bordermarch (1) Ararat (2)
+
+     * Farthing
+
+   Farthing (1)
+
+     * Windemere
+
+   Windemere (1)
+
+     * Stonegate
+
+   Stonegate (1)
+
+     * The Lycaeum
+
+   The Lycaeum (1) The Lycaeum (2) The Lycaeum (3)
+
+     * Empath Abbey
+
+   The Empath Abbey (1) The Empath Abbey (2) The Empath Abbey (3)
+
+     * The Serpent's Hold
+
+   The Serpent's Hold (1) The Serpent's Hold (2) The Serpent's Hold(3)
+
+LOOK2.DAT[edit]
+
+   This file contains the "look" descriptions for the 0x200 tiles. Each
+   description is a zero-terminated ASCII string. Some descriptions consist
+   only of an asterisk, which the game displays as a diamond. The offsets are
+   relative to the beginning of the file.
+
+   look2.dat = set(0x200) of offset16, set(0x200) of ascii_string
+
+   offset16 = uint16 ascii_string = set of ascii_char, terminator ascii_char
+   = uint8 terminator = (uint8) 0
+
+MISCMAPS.DAT[edit]
+
+   This file contains:
+
+    1. 4x Cutscene Screens (11x11 tiles)
+    2. 4x Intro Screens (19x4 tiles)
+    3. Intro Script Data
+
+                          MISCMAPS.DAT File Structure
+   Offset Length (in bytes) Purpose             
+   0x0    704               Cutscene Maps       
+   0x2C0  512               Intro Maps          
+   0x4C0? 655               Script Data [0x28F] 
+
+  Cutscene Maps[edit]
+
+                              Cut sceneMap Format
+   Offset Length (in bytes) Purpose    
+   0x0    16                Map Row 1  
+   0x20   16                Map Row 2  
+   0x30   16                Map Row 3  
+   ...    
+   0xA0   16                Map Row 11 
+
+                                 Map Row Format
+   Offset Length (in bytes) Purpose      
+   0x0    1                 Tile 1       
+   0x1    1                 Tile 2       
+   0x2    1                 Tile 3       
+   ...    
+   0xA    1                 Tile 11      
+   0xB    5                 Zero Padding 
+
+  Intro Maps[edit]
+
+                                Intro Row Format
+   Offset Length (in bytes) Purpose   
+   0x0    32                Map Row 1 
+   0x20   32                Map Row 2 
+   0x40   32                Map Row 3 
+   0x60   32                Map Row 4 
+
+                                Intro Row Format
+   Offset Length (in bytes) Purpose      
+   0x0    1                 Tile 1       
+   0x1    1                 Tile 2       
+   0x2    1                 Tile 3       
+   ...    
+   0x12   1                 Tile 19      
+   0x13   13                Zero Padding 
+
+   Notes:
+
+     * The intro maps are stored in the order in which they appear during the
+       introduction:
+    1. "The Summoning"
+    2. "The Journey"
+    3. "The Arrival"
+    4. "The Welcoming"
+     * the script data controls the movement of NPCs in the introduction
+     * TODO: battle screen descriptions, script format
+
+SIGNS.DAT[edit]
+
+   This file contains the set of 33 (0x21) sign groups in this game. First
+   the 16-bit offsets to each sign are stored; after that comes the data for
+   each sign. Each offset represents 0 or more sign groups for a single
+   location, with differing XY coordinates and floors.
+
+   signs.dat = set(0x21) of offset16, set(0x21) of sign_group
+
+   offset16 = uint16 sign_group = set of sign_data
+
+   sign_data = header4, set of sign_char, terminator
+
+   header4 = location, coord_Z, coord_X, coord_Y location, coord_Z, coord_X,
+   coord_Y = uint8 sign_char = uint8 terminator = (uint8)
+
+                             SIGNS.DAT File Format
+   Offset Length (in bytes) Purpose                     
+   0x0    66                16-bit Offsets of each Sign 
+   0x42   To End of File    Sign Data                   
+
+                                Sign Data Format
+   Offset Length (in bytes) Purpose          
+   0x0    1                 Location         
+   0x1    1                 Z Coordinate     
+   0x2    1                 X Coordinate     
+   0x3    1                 Y Coordinate     
+   0x4    varies            Sign text        
+   varies 1                 terminator (0x0) 
+
+   Notes:
+
+     * offset16[i] points to the signs in location i. For locations without
+       signs, the corresponding offset16 is 0. If you remove the zero values,
+       you'll find that the remaining offset16's are sorted in ascending
+       order.
+     * each sign starts with a 4-byte header, specifying location (shown
+       below), z, x and y coordinates.
+     * the data between your current offset and proceeding offset will
+       contain 1..N signs (sign group) separated by a single NULL (0) byte
+     * in some of the eight virtue towns, there are signs that refer to the
+       laws - if there are two then one is defined by only a "\n", the second
+       definition contains the strings.
+
+                                Location Values
+   Value Location              
+   0x00  Britannia/Underworld  
+   0x01  Moonglow              
+   0x02  Britain               
+   0x03  Jhelom                
+   0x04  Yew                   
+   0x05  Minoc                 
+   0x06  Trinsic               
+   0x07  Skara Brae            
+   0x08  New Magincia          
+   0x09  Fogsbane              
+   0x0A  Stormcrow             
+   0x0B  Greyhaven             
+   0x0C  Waveguide             
+   0x0D  Iolo's hut            
+   0x0E  Sutek's hut           
+   0x0F  Sin'Vraal's hut       
+   0x10  Grendel’s hut         
+   0x11  Lord British's Castle 
+   0x12  Palace of Blackthorn  
+   0x13  West Britanny         
+   0x14  North Britanny        
+   0x15  East Britanny         
+   0x16  Paws                  
+   0x17  Cove                  
+   0x18  Buccaneer's Den       
+   0x19  Ararat                
+   0x1A  Bordermarch           
+   0x1B  Farthing              
+   0x1C  Windemere             
+   0x1D  Stonegate             
+   0x1E  Lycaeum               
+   0x1F  Empath Abbey          
+   0x20  Serpent's Hold        
+
+                              Z Coordinate Values
+   Name Value               
+   0x00 Britannia/Ground    
+   0x01 First Floor         
+   0x02 Second Floor        
+   0x03 Third Floor         
+   0xFF Basement/Underworld 
+
+     * The game may not support signs in dungeons.
+     * Signs can contain characters from both ibm.ch and runes.ch:
+
+   0 <= sign_char <= 0x7F --> runes.ch[sign_char] 0x80 <= sign_char <= 0xFF
+   --> ibm.ch[sign_char - 0x80]
+
+     * If you want to review the plaintext string of a sign, simply subtract
+       128 (0x80) from any character > 127 (0x7F)
+     * The signs each have the lines denoted as lower case alphabet
+       characters.
+
+UNDER.DAT[edit]
+
+   The Underworld map
+
+   Its size is 256x256 tiles.
+
+   It is divided into 256 chunks. Each chunk has a size of 16x16 tiles, and
+   each tile is stored as a uint8 (in Ultima IV, the chunk size was 32x32
+   tiles). Unlike BRIT.DAT, it is not compressed (no chunks were left out).
+
+   The chunks are stored from west to east, north to south, i.e. the first
+   chunk in the map is the one in the northwest corner. The tiles in a chunk
+   are also stored from west to east, north to south.
+
+   U5compu-new.gif
+
+SHOPPE.DAT[edit]
+
+   Shoppe.dat is a fairly straight forward file. It is a list of null byte
+   terminated strings that also use the same compressed word methods used
+   with the NPC dialogue (as referenced in data.ovl position 0x104c).
+
+   +----------------------------------------------------------+
+   |Symbol|Meaning                                            |
+   |------+---------------------------------------------------|
+   |%     |how much gold thing thing will cost or sell for    |
+   |------+---------------------------------------------------|
+   |&     |the current piece of equipment                     |
+   |------+---------------------------------------------------|
+   |#     |current business name                              |
+   |------+---------------------------------------------------|
+   |$     |merchants name                                     |
+   |------+---------------------------------------------------|
+   |@     |barkeeps food/drink etc                            |
+   |------+---------------------------------------------------|
+   |*     |location of thing (ie, see so-and-so at "location")|
+   |------+---------------------------------------------------|
+   |^     |quantity of thing (ie. reagent)                    |
+   +----------------------------------------------------------+
+
+                                  *.HCS[edit]
+
+   Font files with 128 characters each.
+
+   ibm.hcs contains the Latin characters and a number of symbols.
+
+   runes.hcs contains the Britannian runes and the remaining symbols.
+
+   File format:
+
+   Each character is 16x12 pixels, 1 bit per pixel (0 = black, 1 = white). I
+   don't know which palette index is associated with a 0 or 1. Each byte
+   represents 8 pixels. The most significant bit represents the leftmost
+   pixel, and the least significant bit represents the rightmost pixel.
+
+                                  *.NPC[edit]
+
+   Each file contains 4608 bytes.
+
+   There are of course : - CASTLE.NPC - DWELLING.NPC - KEEP.NPC - TOWNE.NPC
+
+CASTLE.NPC[edit]
+
+   Todo.
+
+DWELLING.NPC[edit]
+
+   Todo.
+
+KEEP.NPC[edit]
+
+   Todo.
+
+TOWNE.NPC[edit]
+
+   It is divided into 8 parts.
+
+   These files contain information about NPCs.
+
+   The general structure of the whole file is :
+
+ struct NPC_File {
+   NPC_Info info[8]; // each NPC file has information for 8 maps
+ };
+
+
+   For each city, we have an information entry for the Npcs of the map:
+
+ struct NPC_Info {
+   NPC_Schedule schedule[32];
+   uint8 type[32]; // merchant, guard, etc.
+   uint8 dialog_number[32];
+ };
+
+   The dialog number gives the entry index to the *.TLK file.
+
+   Finally, the schedule says how the Npc moves around in the city and
+   especially when:
+
+ struct NPC_Schedule {
+   uint8 AI_types[3];
+   uint8 x_coordinates[3];
+   uint8 y_coordinates[3];
+   sint8 z_coordinates[3];
+   uint8 times[4];
+ };
+
+   Notes:
+
+   1) All maps can hold a maximum of 31 (not 32) NPC's. In every map,
+   schedule[0], type[0] and dialog_number[0] are not used. However, type[0]
+   is sometimes 0 and sometimes 0x1C, so perhaps it has some unknown purpose.
+
+   2) Each NPC_Schedule contains information about 3 locations that the NPC
+   will go to at different times of day. The x and y coordinates are between
+   0 and 31, because each map has a size of 32x32 tiles. The z coordinates
+   represent the level, relative to level 0. 0xFF would make the NPC go to
+   the level below level 0, while 0x1 would make the NPC go to the level
+   above level 0.
+
+   The times are given in hours, so they range from 0 to 23.
+
+   times[0] --> NPC goes to location 0
+
+   times[1] --> NPC goes to location 1
+
+   times[2] --> NPC goes to location 2
+
+   times[3] --> NPC goes to location 1
+
+  Values for the dialog_number[edit]
+
+   +------------------------------------------------------------------------+
+   |Value                 |Meaning                                          |
+   |----------------------+-------------------------------------------------|
+   |0                     |Guard                                            |
+   |----------------------+-------------------------------------------------|
+   |>0 && < Nbr defined in|Defined by that talk information. Add 256 +      |
+   |the value of the TLK  |dialog_number to get the first sprite. For       |
+   |file                  |example dialog_number=68 would be a bard because |
+   |                      |the bard sprite is 68+256=324.                   |
+   |----------------------+-------------------------------------------------|
+   |129                   |Weapon dealer                                    |
+   |----------------------+-------------------------------------------------|
+   |130                   |Barkeeper                                        |
+   |----------------------+-------------------------------------------------|
+   |131                   |Horse seller                                     |
+   |----------------------+-------------------------------------------------|
+   |132                   |Ship seller                                      |
+   |----------------------+-------------------------------------------------|
+   |133                   |Magic seller                                     |
+   |----------------------+-------------------------------------------------|
+   |134                   |Guild Master                                     |
+   |----------------------+-------------------------------------------------|
+   |136                   |Innkeeper                                        |
+   |----------------------+-------------------------------------------------|
+   |135                   |Healer                                           |
+   +------------------------------------------------------------------------+
+
+                                  *.OVL[edit]
+
+   Code or data overlays.
+
+DATA.OVL[edit]
+
+   Here is the data layout for this file:
+
+   Mapping of Data.ovl
+
+   +------------------------------------------------------------------------+
+   |Offset|Length        |Notes                                             |
+   |------+--------------+--------------------------------------------------|
+   |0     |0x18          |Unknown                                           |
+   |------+--------------+--------------------------------------------------|
+   |0x18  |0x38          |Licence for the MS-Runtime                        |
+   |------+--------------+--------------------------------------------------|
+   |0x52  |0xa6          |Armour strings (13 of them)                       |
+   |------+--------------+--------------------------------------------------|
+   |0xf8  |0x81          |Weapon strings (10 of them)                       |
+   |------+--------------+--------------------------------------------------|
+   |0x179 |0x5a          |Ring and amulet strings (5 of them)               |
+   |------+--------------+--------------------------------------------------|
+   |0x1d3 |0x158         |Character type, monster names (44 of them)        |
+   |------+--------------+--------------------------------------------------|
+   |0x32b |0x165         |Character type, monster names in capital letters  |
+   |      |              |(44 of them)                                      |
+   |------+--------------+--------------------------------------------------|
+   |0x490 |0x33          |Unknown                                           |
+   |------+--------------+--------------------------------------------------|
+   |0x4c3 |0x2b          |Item names (5 of them)                            |
+   |------+--------------+--------------------------------------------------|
+   |0x4ee |0x18          |"(x" where x goes from 0 to 7                     |
+   |------+--------------+--------------------------------------------------|
+   |0x506 |0x28          |Shard names (3 of them)                           |
+   |------+--------------+--------------------------------------------------|
+   |0x52f |0x43          |Additional item names (6 of them)                 |
+   |------+--------------+--------------------------------------------------|
+   |0x572 |0x11a         |Shortened names (29 of them)                      |
+   |------+--------------+--------------------------------------------------|
+   |0x68c |0x30          |Potion colors (8 of them)                         |
+   |------+--------------+--------------------------------------------------|
+   |0x6bc |0x4d          |Reagents (8 of them)                              |
+   |------+--------------+--------------------------------------------------|
+   |0x709 |0x1bb         |Spell names                                       |
+   |------+--------------+--------------------------------------------------|
+   |0x8c4 |0x54          |Character type and names (11 of them)             |
+   |------+--------------+--------------------------------------------------|
+   |0x918 |0x29          |Health text (5 of them)                           |
+   |------+--------------+--------------------------------------------------|
+   |0x941 |0x64          |Spell runes (26 of them)                          |
+   |------+--------------+--------------------------------------------------|
+   |0x9a5 |0xa8          |Unknown                                           |
+   |------+--------------+--------------------------------------------------|
+   |0xa4d |0x111         |City names (in caps) (26 of them)                 |
+   |------+--------------+--------------------------------------------------|
+   |0xb5e |0x3a          |Dungeon names (8 of them)                         |
+   |------+--------------+--------------------------------------------------|
+   |0xb98 |0x48          |Virtue names (8 of them)                          |
+   |------+--------------+--------------------------------------------------|
+   |0xbe0 |0x1e          |Virtue mantras (8 of them)                        |
+   |------+--------------+--------------------------------------------------|
+   |0xbfe |0x2fc         |Store names                                       |
+   |------+--------------+--------------------------------------------------|
+   |0xefa |0x152         |Character names                                   |
+   |------+--------------+--------------------------------------------------|
+   |0x104c|0x24e         |Compressed words used in the conversation files   |
+   |------+--------------+--------------------------------------------------|
+   |0x129a|0x11c         |Filenames                                         |
+   |------+--------------+--------------------------------------------------|
+   |0x13b6|0x3a6         |Unknown                                           |
+   |------+--------------+--------------------------------------------------|
+   |      |              |Armour, weapon and scroll Attack values           |
+   |0x160c|0x37          |                                                  |
+   |      |              |See below for ordered list of armour, weapons and |
+   |      |              |scrolls                                           |
+   |------+--------------+--------------------------------------------------|
+   |      |              |Armour and Weapon Defensive values                |
+   |0x1644|0x2F          |                                                  |
+   |      |              |See below for ordered list of armour, weapons and |
+   |      |              |scrolls                                           |
+   |------+--------------+--------------------------------------------------|
+   |      |              |Armour, weapon and scroll range values (ignore    |
+   |      |              |scrolls)                                          |
+   |0x1674|0x37          |                                                  |
+   |      |              |See below for ordered list of armour, weapons and |
+   |      |              |scrolls                                           |
+   |------+--------------+--------------------------------------------------|
+   |0x1674|0x2F          |Scroll range values (start at 0x30)               |
+   |------+--------------+--------------------------------------------------|
+   |0x175c|0xa9          |Weapon strings (add + 0x10)                       |
+   |------+--------------+--------------------------------------------------|
+   |0x1806|0x70          |Armor index (add + 0x10)                          |
+   |------+--------------+--------------------------------------------------|
+   |0x187a|0x1ee         |Text index (add + 0x10)                           |
+   |------+--------------+--------------------------------------------------|
+   |0x1e2a|0x8           |Which Map index do we start in (for TOWNE.DAT)    |
+   |------+--------------+--------------------------------------------------|
+   |0x1e32|0x8           |Which Map index do we start in (for DWELLING.DAT) |
+   |------+--------------+--------------------------------------------------|
+   |0x1e3a|0x8           |Which Map index do we start in (for CASTLE.DAT)   |
+   |------+--------------+--------------------------------------------------|
+   |0x1e42|0x8           |Which Map index do we start in (for KEEP.DAT)     |
+   |------+--------------+--------------------------------------------------|
+   |0x1e4a|0x1a (13 * 2) |Name of cities index (13 shorts, add 0x10)        |
+   |------+--------------+--------------------------------------------------|
+   |0x1e6e|0x2c (22 * 2) |Name of dwellings/castle/keeps/dungeons index (22 |
+   |      |              |shorts, add 0x10)                                 |
+   |------+--------------+--------------------------------------------------|
+   |0x1e9a|0x28          |X-coordinates to Towns, Dwellings, Castles, Keeps,|
+   |      |              |Dungeons                                          |
+   |------+--------------+--------------------------------------------------|
+   |0x1ec2|0x28          |Y-coordinates to Towns, Dwellings, Castles, Keeps,|
+   |      |              |Dungeons                                          |
+   |------+--------------+--------------------------------------------------|
+   |0x1f5e|0x20          |Virtue and mantra index (add + 0x10)              |
+   |------+--------------+--------------------------------------------------|
+   |0x1f7e|0x33b         |Unknown                                           |
+   |------+--------------+--------------------------------------------------|
+   |0x22da|0x12          |Arms seller's name index                          |
+   |------+--------------+--------------------------------------------------|
+   |0x22ec|0x20c         |Unknown                                           |
+   |------+--------------+--------------------------------------------------|
+   |0x22da|0x12          |Arms seller's name index                          |
+   |------+--------------+--------------------------------------------------|
+   |0x24f8|0x13e         |Indexes to the dialog text (add + 0x10) (see .TLK)|
+   |------+--------------+--------------------------------------------------|
+   |0x2636|0x2b          |.DAT file names (4 files)                         |
+   |------+--------------+--------------------------------------------------|
+   |0x2661|0x9           |Unknown                                           |
+   |------+--------------+--------------------------------------------------|
+   |0x266a|0x269         |Text strings (some unknown in the middle)         |
+   |------+--------------+--------------------------------------------------|
+   |0x28d3|0x83          |Unknown                                           |
+   |------+--------------+--------------------------------------------------|
+   |0x23ea|0x09          |Shoppe Keeper – Towne indexes that have a tavern  |
+   |------+--------------+--------------------------------------------------|
+   |0x23fa|0x04          |Shoppe Keeper – Towne indexes that sell horses    |
+   |------+--------------+--------------------------------------------------|
+   |0x240a|0x04          |Shoppe Keeper – Towne indexes that sell ships     |
+   |------+--------------+--------------------------------------------------|
+   |0x241a|0x05          |Shoppe Keeper – Towne indexes that sell reagents  |
+   |------+--------------+--------------------------------------------------|
+   |0x242a|0x03          |Shoppe Keeper – Towne indexes that sell provisions|
+   |      |              |(Guild)                                           |
+   |------+--------------+--------------------------------------------------|
+   |0x243a|0x07          |Shoppe Keeper – Towne indexes that sell healing   |
+   |------+--------------+--------------------------------------------------|
+   |0x244a|0x06          |Shoppe Keeper – Towne indexes that have an inn    |
+   |------+--------------+--------------------------------------------------|
+   |0x2df4|0x14d         |Unknown                                           |
+   |------+--------------+--------------------------------------------------|
+   |0x2f41|0x5b          |Initial string                                    |
+   |------+--------------+--------------------------------------------------|
+   |0x2f9d|0xa           |STORY.DAT string                                  |
+   |------+--------------+--------------------------------------------------|
+   |0x2fa7|0x175         |Unknown                                           |
+   |------+--------------+--------------------------------------------------|
+   |0x311c|0x76          |Menu texts (6 texts)                              |
+   |------+--------------+--------------------------------------------------|
+   |0x3192|0x22          |ibm.hcs, rune.hcs, ibm.ch, runes.ch strings       |
+   |------+--------------+--------------------------------------------------|
+   |0x31b4|0x42          |Random texts                                      |
+   |------+--------------+--------------------------------------------------|
+   |0x31f6|0xa           |SAVED.GAM string                                  |
+   |------+--------------+--------------------------------------------------|
+   |0x3202|0x462         |Random texts                                      |
+   |------+--------------+--------------------------------------------------|
+   |0x3664|0x322         |Unknown                                           |
+   |------+--------------+--------------------------------------------------|
+   |      |              |Chunking information for Britannia's map, 0xFF the|
+   |0x3886|0x100         |chunk only consists of tile 0x1, otherwise see    |
+   |      |              |BRIT.DAT                                          |
+   |------+--------------+--------------------------------------------------|
+   |0x3986|0xaf          |Random filenames, texts and unknown               |
+   |------+--------------+--------------------------------------------------|
+   |0x3a35|0xd           |Unknown                                           |
+   |------+--------------+--------------------------------------------------|
+   |0x3a42|0x28          |Reagent base prices (towne by towne)              |
+   |------+--------------+--------------------------------------------------|
+   |0x3a6a|0x28          |Reagent quantities (towne by towne)               |
+   |------+--------------+--------------------------------------------------|
+   |      |              |Armour/Weapons/Rings base prices                  |
+   |0x3a92|0x60 (UINT16) |                                                  |
+   |      |              |See Ordered list of Armour, Weapons and Scrolls   |
+   |------+--------------+--------------------------------------------------|
+   |      |0x48 (9 groups|What weapons are sold by the merchant in cities:  |
+   |0x3af2|of 8 bytes)   |Britain, Jhelom, Yew, Minoc, Trinsic, British     |
+   |      |              |Castle, Buccaneer's Den, Bordermarch, Serpent Hold|
+   |------+--------------+--------------------------------------------------|
+   |0x3b3a|0x38          |Unknown                                           |
+   |------+--------------+--------------------------------------------------|
+   |0x3b72|0x8           |Innkeeper welcome text index into SHOPPE.DAT      |
+   |      |              |(+0x0, 2 bytes for each index)                    |
+   |------+--------------+--------------------------------------------------|
+   |0x41e4|0x8c1         |Random texts                                      |
+   |------+--------------+--------------------------------------------------|
+   |0x4aa5|0x2f2         |Unknown                                           |
+   |------+--------------+--------------------------------------------------|
+   |0x4d97|0x361         |Random texts                                      |
+   |------+--------------+--------------------------------------------------|
+   |0x4e7e|0xc           |Inn room description text                         |
+   |------+--------------+--------------------------------------------------|
+   |0x4e8a|0x5           |Inn bed X-coordinate                              |
+   |------+--------------+--------------------------------------------------|
+   |0x4e90|0x5           |Inn bed Y-coordinate                              |
+   +------------------------------------------------------------------------+
+
+   The old list is here for the moment:
+
+   offset      length      purpose
+
+   // monster flags
+   0x154C      0x30*2      flags that define the special abilities of
+                           monsters during combat; 16 bits per monster
+                           0x0020 = undead (affected by An Xen Corp)
+                           todo:
+                           - passes through walls (ghost, Shadowlord)
+                           - can become invisible (wisp, ghost, Shadowlord)
+                           - can teleport (wisp, shadowlord)
+                           - can't move (reaper, mimic)
+                           - able to camouflage itself
+                           - may divide when hit (slime, gargoyle)
+ 
+   // moon phases
+   0x1EEA      28*2        moon phases (28 byte pairs, one for each day of the month)
+
+   // shrines and mantras
+   0x1F7E      8           x coordinates of shrines
+   0x1F86      8           y coordinates of shrines
+  
+   // this section contains information about hidden, non-regenerating objects (e.g. the magic axe in the dead tree in Jhelom); there are
+   // only 0x71 such objects; the last entry in each table is 0
+   0x3E88      0x72        object type (tile - 0x100)
+   0x3EFA      0x72        object quality (e.g. potion type, number of gems)
+   0x3F6C      0x72        location number (see "Party Location")
+   0x3FDE      0x72        level
+   0x4050      0x72        x coordinate
+   0x40C2      0x72        y coordinate
+
+   0x4513      0x8         Sprite indexes of dungeons after word of power has opened them
+   // dock coordinates (where puchased ships/skiffs are placed)
+   // 0 = Jhelom
+   // 1 = Minoc
+   // 2 = East Brittany
+   // 3 = Buccaneer's Den
+   0x4D86      0x4         x coordinate
+   0x4D8A      0x4         y coordinate
+
+   // scan code translation table:
+   // when the player presses a key that produces one of the scan codes in
+   // the first table, the game translates it to the corresponding code in
+   // the second table
+   0x541E      8           scancodes
+   0x5426      8           internal codes
+
+   // wells
+   0x7252      0x32        wishing for one of these keywords at a wishing well gets you a horse
+
+The other OVL[edit]
+
+   The other OVL files, as far as we can tell are actually binary files
+   containing code. The base executable actually loads these up on a need to
+   execute basis.
+
+                                  *.TLK[edit]
+
+   These files contain conversation scripts. Here is the transcript for
+   Ultima V. There are 4 files for each group of Maps :
+
+   +--------------------------------+
+   | FileName     | Size (in bytes) |
+   |--------------+-----------------|
+   | CASTLE.TLK   | 21868           |
+   |--------------+-----------------|
+   | DWELLING.TLK | 7979            |
+   |--------------+-----------------|
+   | KEEP.TLK     | 17947           |
+   |--------------+-----------------|
+   | TOWNE.TLK    | 26835           |
+   +--------------------------------+
+
+   The format for each of these files is:
+
+   +------------------------------------------------------------------------+
+   | Full file                                                              |
+   |------------------------------------------------------------------------|
+   | Number of entries into    | Set of script index | Script data          |
+   | the set of script indices |                     |                      |
+   |---------------------------+---------------------+----------------------|
+   |                           | Npc index  | Offset | Set of uint8 filling |
+   | uint16                    |------------+--------| the file             |
+   |                           | uint16     | uint16 |                      |
+   +------------------------------------------------------------------------+
+
+   Notes:
+
+   1) The first NPC number is 1.
+
+   2) The script_indexes are sorted by NPC number, in ascending order.
+
+   3) The script_data blocks are sorted by NPC number, in ascending order.
+
+   4) The conversations appear to be scripted, like the ones in Ultima VI.
+
+   The way this is linked together is via the NPC information since it gives
+   us the dialogue index which links itself to the script index.
+
+The text encoding[edit]
+
+   For each NPC, there are a certain number of '\0' terminated strings which
+   are encodings of what is the name, job, etc. of the NPC. To decode these
+   texts, I've taken Nodling's decoder and tweaked it a bit.
+
+  First part: fixed entries[edit]
+
+   For each NPC, it starts with a certain number of fixed entries:
+
+   - Name, Description, Greeting, Job, Bye
+
+  Second part: key words[edit]
+
+   We specify it by:
+
+ <Key word> (Therefore text only)
+
+ [<OR character code (see below)> <0 set byte> <Key word> [<OR character code> <0 set byte> <Key word>]...]
+
+ <Answer text> (Potentially anything
+
+  Third part : labels[edit]
+
+   Then it's question/answers with labels.
+
+   Todo
+
+  Generalities[edit]
+
+   For the moment, for each entry, I do :
+
+        if((c >= 160) && (c < 255))
+        {
+            c -= 128;
+        }
+        else
+        {
+            special = true;
+        }
+
+   If it's a special case, then we have two cases : it's a code based symbol,
+   it's an entry to an array of texts from DATA.OVL (the offset table starts
+   at 0x24f8).
+
+   For the moment, I've confirmed these bindings :
+
+   +--------------------------------------------------------+
+   | Symbol value | Meaning                                 |
+   |--------------+-----------------------------------------|
+   | c < 129      | entry to the offset table               |
+   |--------------+-----------------------------------------|
+   | 129          | Insert Avatar’s name                    |
+   |--------------+-----------------------------------------|
+   | 131          | Conversation pause                      |
+   |--------------+-----------------------------------------|
+   | 135          | Or in the key words                     |
+   |--------------+-----------------------------------------|
+   | 136          | Ask for avatar's name                   |
+   |--------------+-----------------------------------------|
+   | 140          | If/Else the NPC knows the Avatar's name |
+   |--------------+-----------------------------------------|
+   | 141          | New line                                |
+   |--------------+-----------------------------------------|
+   | 143          | Key wait                                |
+   |--------------+-----------------------------------------|
+   | 145 ~ 155    | Labels 1 to 10                          |
+   +--------------------------------------------------------+
+
+   If it's not a special case, then I just copy the character in the string.
+
+                              General Notes[edit]
+
+   1) Wishing Wells
+
+   There are two wishing wells in the game: - Paws (location 0x16) - Empath
+   Abbey (location 0x1F)
+
+   These locations are hard-coded into the game. There is no difference
+   between horses from wishing wells and horses from vendors. It also doesn't
+   make any difference if you wish for "horse" or a car brand.
+
+                                 EGA.DRV[edit]
+
+   See u5_ega_drv.txt
+
+                                 INIT.GAM[edit]
+
+   Initial "SAVED.GAM".
+
+                                SAVED.GAM[edit]
+
+   Ultima V (PC version) SAVED.GAM
+
+        ===================[edit]
+
+   Last updated on 3-Jan-2020
+
+   Please send additions, corrections and feedback to this e-mail address:
+
+   Remove space + vowels from "marc winterrowd" and append "at yahoo dot com"
+
+   SAVED.GAM
+
+     ----------------------------------------------------------------------
+
+   This file contains the current saved game.
+
+   When you start a new game, "SAVED.GAM" is initalized from "INIT.GAM".
+
+                                  Save Format
+          Length                                                              
+   Offset (in    Range              Purpose
+          bytes) 
+   0x0    2      ?                  ?                                         
+   0x2    32     n/a                character record 1 (Avatar)               
+   0x22   32     n/a                character record 2                        
+   0x42   32     n/a                character record 3                        
+   0x62   32     n/a                character record 4                        
+   0x82   32     n/a                character record 5                        
+   0xA2   32     n/a                character record 6                        
+   0xC2   32     n/a                character record 7                        
+   0xE2   32     n/a                character record 8                        
+   0x102  32     n/a                character record 9                        
+   0x122  32     n/a                character record 10                       
+   0x142  32     n/a                character record 11                       
+   0x162  32     n/a                character record 12                       
+   0x182  32     n/a                character record 13                       
+   0x1A2  32     n/a                character record 14                       
+   0x1C2  32     n/a                character record 15                       
+   0x1E2  32     n/a                character record 16                       
+   0x202  2      0-9999             food                                      
+   0x204  2      0-9999             gold                                      
+   0x206  1      0-99               keys                                      
+   0x207  1      0-99               gems                                      
+   0x208  1      0-99               torches                                   
+   0x209  1      0,0xFF             grapple                                   
+   0x20A  1      0-99               magic carpets                             
+   0x20B  1      0-99               skull keys                                
+   0x20C  1      ?                  ?                                         
+   0x20D  1      0,0xFF             Amulet of Lord British                    
+   0x20E  1      0,0xFF             Crown of Lord British                     
+   0x20F  1      0,0xFF             Sceptre of Lord British                   
+   0x210  1      0,0xFF             Shard of Falsehood                        
+   0x211  1      0,0xFF             Shard of Hatred                           
+   0x212  1      0,0xFF             Shard of Cowardice                        
+   0x213  1      ?                  ?                                         
+   0x214  1      0-99               spy glasses                               
+   0x215  1      0,0xFF             HMS Cape plans                            
+   0x216  1      0-99               Sextants                                  
+   0x217  1      0,0xFF             Pocket watch                              
+   0x218  1      0,0xFF             Black badge                               
+   0x219  1      0,0xFF             Sandalwood box                            
+   0x21A  1      0-99               Leather helm                              
+   0x21B  1      0-99               Chain coif                                
+   0x21C  1      0-99               Iron helm                                 
+   0x21D  1      0-99               Spiked helm                               
+   0x21E  1      0-99               Small shield                              
+   0x21F  1      0-99               Large Shield                              
+   0x220  1      0-99               Spiked Shield                             
+   0x221  1      0-99               Magic Shield                              
+   0x222  1      0-99               Jewelled Shield                           
+   0x223  1      0-99               Cloth                                     
+   0x224  1      0-99               Leather                                   
+   0x225  1      0-99               Ring mail                                 
+   0x226  1      0-99               Scale                                     
+   0x227  1      0-99               Chain                                     
+   0x228  1      0-99               Plate                                     
+   0x229  1      0-99               Mystic Armour                             
+   0x22A  1      0-99               Dagger                                    
+   0x22B  1      0-99               Sling                                     
+   0x22C  1      0-99               Club                                      
+   0x22D  1      0-99               Flaming oil                               
+   0x22E  1      0-99               Main gauche                               
+   0x22F  1      0-99               Spear                                     
+   0x230  1      0-99               Throwing axe                              
+   0x231  1      0-99               Short sword                               
+   0x232  1      0-99               Mace                                      
+   0x233  1      0-99               Morning star                              
+   0x234  1      0-99               Bow                                       
+   0x235  1      0-99               Arrows                                    
+   0x236  1      0-99               Crossbow                                  
+   0x237  1      0-99               Quarrels                                  
+   0x238  1      0-99               Long sword                                
+   0x239  1      0-99               2-H hammer                                
+   0x23A  1      0-99               2-H axe                                   
+   0x23B  1      0-99               2-H sword                                 
+   0x23C  1      0-99               Halberd                                   
+   0x23D  1      0-99               Chaos sword                               
+   0x23E  1      0-99               Magic bow                                 
+   0x23F  1      0-99               Silver sword                              
+   0x240  1      0-99               Magic Axe                                 
+   0x241  1      0-99               Glass sword                               
+   0x242  1      0-99               Jeweled sword                             
+   0x243  1      0-99               Mystic sword                              
+   0x244  1      0-99               Invisibility Ring                         
+   0x245  1      0-99               Protection Ring                           
+   0x246  1      0-99               Regeneration Ring                         
+   0x247  1      0-99               Amulet of Turning                         
+   0x248  1      0-99               Spiked collar                             
+   0x249  1      0-99               Ankh                                      
+   0x24A  1      0-99               In Lor                                    
+   0x24B  1      0-99               Grav Por                                  
+   0x24C  1      0-99               An Zu                                     
+   0x24D  1      0-99               An Nox                                    
+   0x24E  1      0-99               Mani                                      
+   0x24F  1      0-99               An Ylem                                   
+   0x250  1      0-99               An Sanct                                  
+   0x251  1      0-99               An Xen Corp                               
+   0x252  1      0-99               Rel Hur                                   
+   0x253  1      0-99               In Wis                                    
+   0x254  1      0-99               Kal Xen                                   
+   0x255  1      0-99               In Xen Mani                               
+   0x256  1      0-99               Vas Lor                                   
+   0x257  1      0-99               Vas Flam                                  
+   0x258  1      0-99               In Flam Grav                              
+   0x259  1      0-99               In Nox Grav                               
+   0x25A  1      0-99               In Zu Grav                                
+   0x25B  1      0-99               In Por                                    
+   0x25C  1      0-99               An Grav                                   
+   0x25D  1      0-99               In Sanct                                  
+   0x25E  1      0-99               In Sanct Grav                             
+   0x25F  1      0-99               Uus Por                                   
+   0x260  1      0-99               Des Por                                   
+   0x261  1      0-99               Wis Quas                                  
+   0x262  1      0-99               In Bet Xen                                
+   0x263  1      0-99               An Ex Por                                 
+   0x264  1      0-99               In Ex Por                                 
+   0x265  1      0-99               Vas Mani                                  
+   0x266  1      0-99               In Zu                                     
+   0x267  1      0-99               Rel Tym                                   
+   0x268  1      0-99               In Vas Por Ylem                           
+   0x269  1      0-99               Quas An Wis                               
+   0x26A  1      0-99               In An                                     
+   0x26B  1      0-99               Wis An Ylem                               
+   0x26C  1      0-99               An Xen Ex                                 
+   0x26D  1      0-99               Rel Xen Bet                               
+   0x26E  1      0-99               Sanct Lor                                 
+   0x26F  1      0-99               Xen Corp                                  
+   0x270  1      0-99               In Quas Xen                               
+   0x271  1      0-99               In Quas Wis                               
+   0x272  1      0-99               In Nox Hur                                
+   0x273  1      0-99               In Quas Corp                              
+   0x274  1      0-99               In Mani Corp                              
+   0x275  1      0-99               Kal Xen Corp                              
+   0x276  1      0-99               In Vas Grav Corp                          
+   0x277  1      0-99               In Flam Hur                               
+   0x278  1      0-99               Vas Rel Por                               
+   0x279  1      0-99               An Tym                                    
+   0x27A  1      0-99               Vas Lor (scroll)                          
+   0x27B  1      0-99               Rel Hur (scroll)                          
+   0x27C  1      0-99               In Sanct (scroll)                         
+   0x27D  1      0-99               In An (scroll)                            
+   0x27E  1      0-99               In Quas Wis (scroll)                      
+   0x27F  1      0-99               Kal Xen Corp (scroll)                     
+   0x280  1      0-99               In Mani Corp (scroll)                     
+   0x281  1      0-99               An Tym (scroll)                           
+   0x282  1      0-99               Blue potion                               
+   0x283  1      0-99               Yellow potion                             
+   0x284  1      0-99               Red potion                                
+   0x285  1      0-99               Green potion                              
+   0x286  1      0-99               Orange potion                             
+   0x287  1      0-99               Purple potion                             
+   0x288  1      0-99               Black potion                              
+   0x289  1      0-99               White potion                              
+   0x28A  8      n/a                0-0xFF Moonstone X-coordinates (valid     
+                                    only if buried)                           
+   0x292  8      n/a                0-0xFF Moonstone Y-coordinates (valid     
+                                    only if buried)                           
+   0x29A  8      n/a                0=buried,0xFF=Inventory moonstone flags   
+   0x2A2  8      n/a                0=Britannia,0xFF=Underworld moonstone     
+                                    Z-coordinates (valid only if buried)      
+   0x2AA  1      0-99               Sulphurous ash                            
+   0x2AB  1      0-99               Ginseng                                   
+   0x2AC  1      0-99               Garlic                                    
+   0x2AD  1      0-99               Spider silk                               
+   0x2AE  1      0-99               Blood moss                                
+   0x2AF  1      0-99               Black pearl                               
+   0x2B0  1      0-99               Nightshade                                
+   0x2B1  1      0-99               Mandrake root                             
+   0x2B2  1      ?                  ?                                         
+   0x2B3  1      ?                  ?                                         
+   0x2B4  1      ?                  ?                                         
+   0x2B5  1      1-6                # Party members                           
+   0x2B6  0xF    n/a                Non-regenerating object flags[1]          
+   0x2C5  1      ?                  ?                                         
+   0x2C6  1      ?                  ?                                         
+   0x2C7  1      ?                  ?                                         
+   0x2C8  1      ?                  ?                                         
+   0x2C9  1      ?                  ?                                         
+   0x2CA  1      ?                  ?                                         
+   0x2CB  1      ?                  ?                                         
+   0x2CC  1      ?                  ?                                         
+   0x2CD  1      ?                  ?                                         
+   0x2CE  2      1-?                Current year                              
+   0x2D0  2      0-?                # of active monsters & charmed PCs[2]     
+   0x2D2  2      0-?                # of active PCs and charmed monsters[2]   
+                                    Icon shown between stats window and the   
+   0x2D4  1      n/a                food/gold/date window (from one of the    
+                                    *.CH files)                               
+   0x2D5  1      0-5,0xFF=None      Active character                          
+   0x2D6  1      n/a                Mode of transportation (foot, ship,       
+                                    skiff, horse, carpet) [3]                 
+   0x2D7  1      1-13               Current month                             
+   0x2D8  1      1-28               Current day                               
+   0x2D9  1      0-23               Current hour                              
+   0x2DA  1      0-23               copy of 0x2D9                             
+   0x2DB  1      0-59               Current minute                            
+   0x2DC  1      ?                  ?                                         
+   0x2DD  1      ?                  ?                                         
+   0x2DE  1      ?                  ?                                         
+   0x2DF  1      0x30-0x37          Phase of Trammel [4]                      
+   0x2E0  1      0x30-0x37          Phase of Felucca [5]                      
+   0x2E1  1      0-0x10             Current moongate height (in pixels) [6]   
+   0x2E2  1      0-255              Karma                                     
+   0x2E3  1      ?                  ?                                         
+   0x2E4  1      ?                  ?                                         
+   0x2E5  1      0-0xFF             # of turns since game began of (stops at  
+                                    0xFF)                                     
+   0x2E6  1      0-0xE              # of hours until party heals again via    
+                                    camping [7]                               
+   0x2E7  1      ?                  ?                                         
+   0x2E8  1      n/a                Protective spell duration [8]             
+   0x2E9  1      ?                  ?                                         
+   0x2EA  1      ?                  ?                                         
+   0x2EB  1      0,1,0xFF           Animations during next frame [9]          
+   0x2EC  1      0-4                Wind direction (0=calm, 1=N, 2=S, 3=E,    
+                                    4=W)                                      
+   0x2ED  1      s.b.               Current party location                    
+   0x2EE  1      s.b.               Combat backup of 0x2ED                    
+   0x2EF  1      0xFF,0-7           Z-coordinate of party [10]                
+   0x2F0  1      0xFF]              X-coordinate of party                     
+   0x2F1  1      0xFF]              Y-coordinate of party                     
+   0x2F2  1      0=hidden,1=visible Crosshair visibility (combat only,        
+                                    0=hidden, 1=visible)                      
+   0x2F3  1      0-0xA              X-coord of crosshair                      
+   0x2F4  1      0-0xA              Y-coord of crosshair                      
+   0x2F5  1      0-0xF0             X-coord of upper left chunk [11]          
+   0x2F6  1      0-0xF0             Y-coord of upper left chunk               
+   0x2F7  1      0-?                Attacker's weapon [12]                    
+   0x2F8  1      ?                  ?                                         
+   0x2F9  1      0=hidden,1=visible Visibility state of focus rectangle &     
+                                    crosshair                                 
+   0x2FA  1      0-6                Exit direction from combat map            
+                                    0=None,1=W,2=E,3=N,4=S,5=U,6=D            
+   0x2FB  1      s.d.               Combat type flags [13]                    
+   0x2FC  1      ?                  ?                                         
+   0x2FD  1      0,1                "No more enemies" flag (whether or not    
+                                    Esc leaves combat)                        
+   0x2FE  1      0,1                Update/animate 2-D map? [14]              
+   0x2FF  1      0-?                Current light intensity                   
+   0x300  1      0-0xFF             Remaining light spell duration (in turns) 
+                                    [15]                                      
+   0x301  1      0-0xF0             Remaining rorch duration (in turns) [15]  
+   0x302  0x20   (1 per creature)   n/a Monster interference table [16]       
+   0x322  1      0-8,0xFF           Location of the Shadowlord of Falsehood   
+                                    [17]                                      
+   0x323  1      0-8,0xFF           Location of the Shadowlord of Hatred      
+                                    ([17]                                     
+   0x324  1      0-8,0xFF           Location of the Shadowlord of Cowardice   
+                                    [17]                                      
+   0x325  1      ?                  ?                                         
+                                    Ordained Shrine quests                    
+                                       bit 0 = Honesty                        
+                                       bit 1 = Compassion                     
+                                       bit 2 = Valor                          
+   0x326  1      0-0xFF                bit 3 = Justice                        
+                                       bit 4 = Sacrifice                      
+                                       bit 5 = Honor                          
+                                       bit 6 = Spirituality                   
+                                       bit 7 = Humility                       
+   0x327  1      ?                  ?                                         
+   0x328  1      0-0xFF             Completed Shrine quests, bits have the    
+                                    same meaning as in 0x326                  
+   0x329  1      ?                  ?                                         
+                                    open/sealed flag for each dungeon         
+   0x32A  8      n/a                   0 = sealed                             
+                                       0x80 = open                            
+                                    destroyed/ok flag for each shrine         
+                                       one byte per shrine, only bit 7 is     
+   0x332  8      n/a                   used                                   
+                                       bit 7 = 0 --> ok                       
+                                       bit 7 = 1 --> destroyed                
+                                    dungeon room cleared flags (7 dungeons, 2 
+                                    bytes per dungeon) when you kill all      
+                                    monsters in a dungeon room, two things    
+                                    happen:                                   
+                                                                              
+                                     1. the bit corresponding to the dungeon  
+   0x33A  0xE    n/a                    room is set to 1                      
+                                     2. in the dungeon map at 0x3B4, the      
+                                        room's upper nibble is set to 0xA     
+                                                                              
+                                    Note: there are no flags for Doom,        
+                                    because you can't leave Doom (except by   
+                                    winning the game)                         
+   0x348  0x20   n/a                X-coordinates of annotations              
+   0x368  0x20   n/a                Y-coordinates of annotations              
+   0x388  0x20   n/a                Annotation tiles                          
+                                    Number of entries in the annotation       
+   0x3A8  1      0-0x20                                                       
+                                    table (see below)                         
+                                    When you open a door, the game stores     
+   0x3A9  1      s.d.               door tile in this byte. Only onedoor can  
+                                    be open at any time.                      
+   0x3AA  1      0-0x1F             X-coord of open door                      
+   0x3AB  1      0-0x1F             Y-coord of open door                      
+                                    Number of turns the door stays open.      
+   0x3AC  1      0-FF               Decremented every turn, wraps aroundto    
+                                    0xFF.                                     
+   0x3AD  1      0-0xFF             X-coord of purchased ship (see 0x105F)    
+   0x3AE  1      0-0xFF             Y-coord of purchased ship (see 0x105F)    
+                                    When you hoist your ship's sails and      
+                                    press an arrow key, the game stores the   
+                                    direction in this byte                    
+   0x3AF  1      0-4                   0 = none                               
+                                       1 = west                               
+                                       2 = east                               
+                                       3 = north                              
+                                       4 = south                              
+                                    New prompt at end of current turn         
+                                       0 = don't display newline and prompt   
+   0x3B0  1      0,1                   when the current turn ends             
+                                       1 = display newline and prompt at end  
+                                       of current turn                        
+                                    Number of drunken moves until you can     
+   0x3B1  1      0-0x19             move normally again; set to 0x19 when you 
+                                    get drunk                                 
+   0x3B2  1      ?                  ?                                         
+   0x3B3  1      ?                  ?                                         
+   0x3B4  0x200  n/a                Map of the current dungeon 8 levels, 8x8  
+                                    tiles per level                           
+                                    "NPC killed" flags, 4 bytes (32 bits, 32  
+   0x5B4  0x80   n/a                NPCs) per settlement                      
+                                       flag = 0 --> NPC is alive              
+                                       flag = 1 --> NPC has been killed       
+                                    "NPC met" flags, 4 bytes (32 bits,32      
+                                    NPCs) per settlement                      
+                                       flag = 0 --> party hasn't met NPC yet  
+   0x634  0x80   n/a                   flag = 1 --> party has met the NPC     
+                                                                              
+                                    Note: ("met" means that the NPC has asked 
+                                    the Avatar's name and received a truthful 
+                                    answer)                                   
+                                    Monster table (has 0x20 slots)            
+   0x6B4  0x100  n/a                                                          
+                                    monster format: see below                 
+   0x7B4  4      ?                  ?                                         
+                                    NPC schedules                             
+   0x7B8  0x200  n/a                                                          
+                                    See *.NPC in u5tech.txt (used only in     
+                                    settlements)                              
+   0x9B8  0x200  0x10 * 0x40        Character/monster states (see below)      
+   0xBB8  0x400  n/a                Movement list table (see below)           
+   0xFB8  0x40   n/a                Movement list pointers (see below)        
+                                    NPC types. These are the sprite numbers   
+                                    for the NPCs on the current map (must add 
+                                    0x100 because they are in bytes, but      
+   0xFF8  0x20   n/a                extend to top half of sprite grid)        
+                                                                              
+                                    (See *.NPC in u5tech.txt (used only in    
+                                    settlements)                              
+   0x1018 0x44   ?                  ?                                         
+   0x105C 1      ?                  Copy of 0x105D?                           
+                                    orientation in a dungeon                  
+                                       0 = north                              
+   0x105D 1      0-3                   1 = east                               
+                                       2 = south                              
+                                       3 = west                               
+                                    graphics for the current dungeon          
+   0x105E 1      1-3                   1 = cave                               
+                                       2 = mine                               
+                                       3 = dungeon                            
+                                    When you buy a ship or skiff, the game    
+                                    encodes your purchase in this byte: 0x40  
+                                    = skiff n = frigate with (n-0x80) skiffs  
+   0x105F 1      s.d.               on board, n >= 0x80 when you leave the    
+                                    settlement where you bought the vessel,   
+                                    the game creates it at the coordinates    
+                                    stored in 0x3AD and 0x3AF                 
+
+   Notes:
+
+                             Save Game Format Notes
+   NoteNum Note                                                               
+           one bit per object                                                 
+   [1]        bit = 0 --> object is still there                               
+              bit = 1 --> object has been taken                               
+           (combat only)                                                      
+   [2]        active = sleeping, good, poisoned                               
+              inactive = charmed, dead, fled                                  
+   [3]     Add 0x100 to get the real tile                                     
+   [4]     If the hour is 0-4, this byte determines where moongates take the  
+           party.                                                             
+   [5]     If the hour is 20-23, this byte determines where moongates take    
+           the party.                                                         
+   [6]     
+           This is set to 0xE when the party gets healed by camping; it is    
+           decremented every full hour.                                       
+   [7]                                                                        
+           If this byte is 0 at the end of your camping rest, the party gets  
+           healed, but only if you rested for 6-9 hours; camping for 1-5      
+           hours never heals the party                                        
+              0 = no protective spell is active                               
+              0xFF = spell remains active until removed (Badge, Crown,        
+   [8]        Sceptre, Amulet)                                                
+              else = turns until the spell expires (spell type is stored in   
+              0x2D4)                                                          
+           When time has been stopped, the game sets this byte to 0 during    
+   [9]     every frame.                                                       
+              0 = skip animations during the next frame                       
+              1 = animate tiles during the next frame 0xFF = ?                
+           Dungeons                                                           
+              0 = level 1                                                     
+              7 = level 8                                                     
+                                                                              
+           settlements                                                        
+   [10]       0xFF = basement                                                 
+              0 = ground floor,                                               
+              1 = first floor, etc.                                           
+                                                                              
+           outside                                                            
+              0 = Britannia                                                   
+              0xFF = Underworld                                               
+   [11]    
+           (combat only)                                                      
+                                                                              
+   [12]    When a PC attacks a monster during combat, the game stores the     
+           attack method in this byte. The attack method can be a weapon or a 
+           spell.                                                             
+   [13]    
+              0 = don't update/animate 2D map                                 
+              1 = update and animate 2D map                                   
+   [14]                                                                       
+           Ignored in dungeons. Set to 1 when you enter or leave a            
+           settlement. I don't know if the game ever sets it to 0.            
+   [15]    In Lor spell, borrowed torch = 0x64 Vas Lor spell = 0xFF Vas Lor   
+           scroll, ignited torch = 0xF0                                       
+   [16]    0xFF = no monster interferes with this creature else = index of    
+           the monster that interferes with this creature                     
+              0 = none                                                        
+              1 = Moonglow                                                    
+              2 = Britain                                                     
+              3 = Jhelom                                                      
+   [17]       4 = Yew                                                         
+              5 = Minoc                                                       
+              6 = Trinsic                                                     
+              7 = Skara Brae                                                  
+              8 = New Magincia                                                
+              0xFF = destroyed                                                
+            1. If you set one of the bytes at 0x322-0x324 to 0xFF, that just  
+               means the respective shadowlord won't visit the towns anymore. 
+               You'll still encounter the shadowlord in Stonegate, unless     
+               you've also set its "NPC killed" flag.                         
+            2. The Crown and the Sandalwood Box are treated as NPC's. When    
+               you take them, the game sets their "NPC killed" flag.          
+                 1. Crown = NPC 1 in Blackthorn's castle                      
+                 2. Sandalwood Box = NPC 31 in Lord British's castle          
+                  * You can cast spells in Blackthorn's castle if you have    
+                    the Crown in your inventory. If you don't have the Crown, 
+                    the game assumes that it's still in Blackthorn's castle,  
+                    and all spells you cast there will be absorbed.           
+            3. Annotation table: when you're in a settlement, this table      
+               contains the locations of drawbridges.                         
+   [18]           * At 8 PM, the game places water tiles (tile 3) at the      
+                    locations stored in the annotation table.                 
+                  * At 5 AM, the game places the tiles stored in the          
+                    annotation table at the corresponding locations. Changing 
+                    the table in SAVED.GAM has no effect, because the game    
+                    restores it from somewhere else when you Journey Onward.  
+            4. Chunk cache:                                                   
+                  * Britannia and the Underworld are divided into chunks of   
+                    16x16 tiles.                                              
+                  * Four of these chunks are cached in at any time; you see   
+                    them when you view a gem.                                 
+                  * The coordinates of the upper left corner of the upper     
+                    left chunk are stored at 0x2F5 and 0x2F6. Both            
+                    coordinates are divisible by 0x10. In settlements, both   
+                    coordinates are set to 0.                                 
+
+   --- Movement Lists ---
+   When it's time for an NPC to move to a new location (as dictated by his
+   schedule), the game calculates a path to the new location and stores this
+   path in the NPC's movement list. The movement lists are stored at 0xBB8.
+   There are 0x20 lists (one for eachNPC). Each list can store up to 0x10
+   movement commands. The movement commands are made up of two bytes: the
+   number of repetitions and the direction.
+
+    struct Movement_List_Table {
+       Movement_List mov_lists[0x20];
+    }
+    struct Movement_List {
+       Movement_Command mov_commands[0x10];
+    }
+    struct Movement_Command {
+       uint8 repeats;
+       // 1 = east
+       // 2 = north
+       // 3 = west
+       // 4 = south
+       uint8 direction;
+    }
+
+   The table at 0xFB8 contains 0x20 word offsets (one for each NPC). Entries
+   can have the following values:
+
+     * 0xFFFF = movement list for the NPC is empty
+     * else = offset into the NPC's movement list (must be a multiple of 2)
+
+   If the NPC hasn't reached his destination after going through the movement
+   commands, the game calculates a new path and stores it in the NPC's
+   movement list.
+   Notes:
+
+     * There are no up/down movement commands. When an NPC wants to move to a
+       location on another level, he goes to the nearest stair/ladder and
+       then teleports to his destination.
+
+   ----Character/Monster States---
+
+                                     States
+   offset Description                                         
+   0      ?                                                   
+   2      Current position - x                                
+   4      Current position - y                                
+   6      Current position - z (floor)                        
+   8      Tile reference number (add 0x100)                   
+   10     ?                                                   
+   12     Character animation state index                     
+   14     (?) if > 0, then the character is active on the map 
+
+   Note: referenced in MapCharacterState.cs
+
+   --- Monster Format ---
+
+                                 Monster Format
+   offset length purpose                
+   0      1      Tile                   
+   1      1      Tile                   
+   2      1      X-oordinate            
+   3      1      Y-coordinate           
+   4      1      Z-coordinate (level)   
+   5      1      Depends on object type 
+   6      1      Depends on object type 
+   7      1      Depends on object type 
+
+   Notes:
+
+    1. The monster table contains not only monsters, but also inanimate
+       objects (e.g. empty ships) and the party.
+    2. The party is always in slot 0.
+    3. Non-empty entries don't have to be contiguous.
+
+   Todo: empty entries, object-specific fields
+
+   --- Character record format ---
+
+                                 Monster Format
+   Offset Length Purpose                 Range                                
+   0      9      Character name          Zero-terminated string (length =     
+                                         8+1)                                 
+   9      1      Gender                     0xB = male                        
+                                            0xC = female                      
+                                            'A'vatar,                         
+   0xA    1      class                      'B'ard                            
+                                            'F'ighter,                        
+                                            'M'age                            
+   0xB    1      Status                  'G'ood, etc.                         
+   0xC    1      Strength                1-50                                 
+   0xD    1      Dexterity               1-50                                 
+   0xE    1      Intelligence            1-50                                 
+   0xF    1      Current MP              0-50                                 
+   0x10   2      Current HP              1-240                                
+   0x12   2      Maximum HP              1-240                                
+   0x14   2      Exp points              0-9999                               
+   0x16   1      Level                   1-8                                  
+   0x17   1      ?                       ?                                    
+   0x18   1      ?                       ?                                    
+   0x19   1      Helmet                  0-0x2F,0xFF                          
+   0x1A   1      Armor                   0-0x2F,0xFF                          
+   0x1B   1      Weapon or shield (left  0-0x2F,0xFF                          
+                 hand)                   
+   0x1C   1      Weapon or shield (right 0-0x2F,0xFF                          
+                 hand)                   
+   0x1D   1      Ring                    0-0x2F,0xFF                          
+   0x1E   1      Amulet                  0-0x2F,0xFF                          
+   0x1F   1      Inn/party               n/a                                  
+
+   Notes:
+
+     * If the character is staying at an inn, the byte at offset 0x1F
+       contains the settlement number (see "Party Location") of the inn.
+     * If the character is in the party, it contains 0.
+     * If the character hasn't joined the party yet, it contains 0xFF.
+     * If the character has been permanently killed, it contains 0x7F.
+
+   Ordered list of armour, weapons and scrolls
+
+                                   Equipment
+   Item Number Item                  
+   0           Leather helm          
+   1           Chain coif            
+   2           Iron helm             
+   3           Spiked helm           
+   4           Small shield          
+   5           Large shield          
+   6           Spiked shield         
+   7           Magic shield          
+   8           Jewel shield          
+   9           Cloth armour          
+   10          Leather armour        
+   11          Ringmail              
+   12          Scale mail            
+   13          Chain mail            
+   14          Plate mail            
+   15          Mystic armour         
+   16          Dagger                
+   17          Sling                 
+   18          Club                  
+   19          Flaming oil           
+   20          Main gauche           
+   21          Spear                 
+   22          Throwing axe          
+   23          Short sword           
+   24          Mace                  
+   25          Morning star          
+   26          Bow                   
+   27          Arrows                
+   28          Crossbow              
+   29          Quarrels              
+   30          Long sword            
+   31          2-H hammer            
+   32          2-H axe               
+   33          2-H sword             
+   34          Halberd               
+   35          Sword of Chaos        
+   36          Magic bow             
+   37          Silver sword          
+   38          Magic sxe             
+   39          Glass sword           
+   40          Jeweled sword         
+   41          Mystic sword          
+   42          Ring of Invisibiliity 
+   43          Ring of Protection    
+   44          Ring of Regeneration  
+   45          Amulet of Turning     
+   46          Spiked collar         
+   47          Ankh                  
+   48          Flam Por              
+   49          Vas Flam              
+   50          In Corp               
+   51          Uus Nox               
+   52          Uus Zu                
+   53          Uus Flam              
+   54          Uus Sanct             
+
+   --- Party Location ---
+
+                                   Equipment
+   index Location              
+   0x0   Britannia/Underworld  
+   0x1   Moonglow              
+   0x2   Britain               
+   0x3   Jhelom                
+   0x4   Yew                   
+   0x5   Minoc                 
+   0x6   Trinsic               
+   0x7   Skara Brae            
+   0x8   New Magincia          
+   0x9   Fogsbane              
+   0xA   Stormcrow             
+   0xB   Greyhaven             
+   0xC   Waveguide             
+   0xD   Iolo's hut            
+   0xE   Sutek's hut           
+   0xF   Sin'Vraal's hut       
+   0x10  Grendel's hut         
+   0x11  Castle British        
+   0x12  Castle Blackthorn     
+   0x13  West Britanny         
+   0x14  North Britanny        
+   0x15  East Britanny         
+   0x16  Paws                  
+   0x17  Cove                  
+   0x18  Buccaneer's Den       
+   0x19  Ararat                
+   0x1A  Bordermarch           
+   0x1B  Farthing              
+   0x1C  Windemere             
+   0x1D  Stonegate             
+   0x1E  The Lycaeum           
+   0x1F  Empath Abbey          
+   0x20  Serpent's Hold        
+   0x21  Deceit                
+   0x22  Despise               
+   0x23  Destard               
+   0x24  Wrong                 
+   0x25  Covetous              
+   0x26  Shame                 
+   0x27  Hythloth              
+   0x28  Doom                  
+   0xFF  Combat/resting/shrine 
+
+                                 Sources[edit]
+
+   Nytegard <email: append "at yahoo dot com" to his nick>
+
+   http://nodling.nullneuron.net/nytegard/nytegard.html
+
+   http://nodling.nullneuron.net/ultima/ultima.html
+
+   http://martin.brenner.de/ultima/u5save.html
+
+   http://www.cosy.sbg.ac.at/~lendl/ultima/ultima5/ on the Internet Archive
+
+   http://www.wi.leidenuniv.nl/~psimoons/ultima5t.htm on the Internet Archive
+
+   Sheng Long Gradilla <email: replace the two spaces in his name with dots
+   and append "at gmail dot com">
+
+   Brad Hannah <email: wellthisisfunsoftware at gmail dot com>
+
+     ----------------------------------------------------------------------
+
+   Technical Details
+   Game Ultima III ☥ Ultima IV ☥ Ultima V ☥ Ultima VI ☥ Ultima VII ☥          
+        Ultima VIII ☥ Ultima IX ☥ Ultima Underworld                           
+
+   Retrieved from
+   "https://wiki.ultimacodex.com/index.php?title=Ultima_V_internal_formats&oldid=162528"
+   Categories:
+     * Stubs
+     * Technical Details
+     * Ultima V
+
+Navigation menu
+
+  Page actions
+
+     * Page
+     * Discussion
+     * Edit
+     * History
+
+  Page actions
+
+     * Page
+     * Discussion
+     * More
+     * Tools
+     * In other languages
+
+  Personal tools
+
+     * Not logged in
+     * Talk
+     * Contributions
+     * Create account
+     * Log in
+   Visit the main page
+
+  Navigation
+
+     * Main Page
+     * Games
+     * Characters
+     * Geography
+     * Books
+     * Trinkets
+     * Maps
+     * Bestiary
+     * Fan works
+     * Random page
+
+  Community
+
+     * The Ultima Codex
+     * SotAWiki
+     * Ultima Forever Wiki
+     * Ultima Online Wiki
+     * Community portal
+     * Recent changes
+     * Help
+     * Forum
+     * Create new page
+
+  Tools
+
+     * What links here
+     * Related changes
+     * Special pages
+     * Printable version
+     * Permanent link
+     * Page information
+     * Browse properties
+
+  Search
+
+   _____________________ [ Go ]   [ Search ]
+   navigationuser toolsback to top
+   Attribution-ShareAlike 3.0 Unported
+   Powered by MediaWikiPowered by Semantic MediaWiki
+     * This page was last edited on 1 October 2021, at 06:54.
+     * Content is available under Attribution-ShareAlike 3.0 Unported unless
+       otherwise noted.
+     * Privacy policy
+     * About Ultima Codex
+     * Disclaimers
