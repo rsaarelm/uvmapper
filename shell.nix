@@ -17,10 +17,7 @@ pkgs.mkShell {
     #rustc cargo rustfmt rust-analyzer cargo-outdated clippy
 
     # Utils
-    just linuxPackages.perf hotspot
-
-    # Map editor
-    tiled
+    just linuxPackages.perf hotspot optipng
   ];
 
   RUST_BACKTRACE = "1";

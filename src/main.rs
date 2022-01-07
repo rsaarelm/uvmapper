@@ -94,6 +94,9 @@ lazy_static! {
         let mut tiles: Vec<u8> =
             tiles.into_iter().flat_map(|b| [b >> 4, b & 0xf]).collect();
 
+        // The game does some dynamic graphics tricks with the tiles, try to
+        // replicate some here.
+
         // Recolor grass (tile 5) to red cave floor.
         for i in 5*256..6*256 {
             if tiles[i] == Green as u8 {
@@ -471,7 +474,7 @@ fn main() {
         for z in 0..8 {
             let map = dungeon.draw_level_map(z);
             let filename =
-                format!("/tmp/{}-{}.png", name.to_lowercase(), z + 1);
+                format!("{}-{}.png", name.to_lowercase(), z + 1);
             eprintln!("{}", filename);
             map.save(filename).unwrap();
         }
