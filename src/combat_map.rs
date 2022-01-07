@@ -4,6 +4,10 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug)]
 pub(crate) struct CombatMapRaw {
+    // The native structure is messy,
+    // <https://wiki.ultimacodex.com/wiki/Ultima_V_internal_formats>.
+    // Convert it to the cleaner and more idomatic `CombatMap` when
+    // deserializing.
     row_0: [u8; 11],
     new_tiles: [u8; 8],
     pad_0: [u8; 13],
