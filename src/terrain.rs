@@ -170,4 +170,3 @@ pub const TERRAIN: [Terrain; 256] = [
     GuildSign, InnSign, ApothecarySign, Unknown, ShipwrightSign,
     GrandfatherClock, GrandfatherClock, Bellows, Bellows, Wall, Darkness,
 ];
-

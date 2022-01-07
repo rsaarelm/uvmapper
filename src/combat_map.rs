@@ -1,4 +1,4 @@
-use std::fmt;
+use std::{collections::HashMap, fmt};
 
 use serde::{Deserialize, Serialize};
 
@@ -69,9 +69,9 @@ pub struct CombatMap {
     pub player_south: [[u8; 2]; 6],
     pub player_north: [[u8; 2]; 6],
 
-    pub monsters: Vec<(u8, [u8; 2])>,
+    pub monsters: HashMap<[u8; 2], usize>,
 
-    pub triggers: Vec<([u8; 2], Vec<(u8, [u8; 2])>)>,
+    pub triggers: HashMap<[u8; 2], HashMap<[u8; 2], u8>>,
 }
 
 fn merge_coords<const N: usize>(xs: &[u8; N], ys: &[u8; N]) -> [[u8; 2]; N] {
@@ -116,23 +116,22 @@ impl From<CombatMapRaw> for CombatMap {
 
         for (i, &m) in data.monsters.iter().enumerate() {
             if m != 0 {
-                ret.monsters
-                    .push((m, [data.monsters_x[i], data.monsters_y[i]]));
+                let p = [data.monsters_x[i], data.monsters_y[i]];
+                //debug_assert!(!ret.monsters.contains_key(&p));
+                ret.monsters.insert(p, m as usize + 256);
             }
         }
 
         for (i, &t) in data.new_tiles.iter().enumerate() {
             if t != 0 {
                 let trigger = [data.trigger_x[i], data.trigger_y[i]];
+                //debug_assert!(!ret.triggers.contains_key(&trigger));
 
                 let p1 = [data.change_0_x[i], data.change_0_y[i]];
                 let p2 = [data.change_1_x[i], data.change_1_y[i]];
-                let mut fx = vec![(t, p1)];
-                if p2 != p1 {
-                    fx.push((t, p2));
-                }
 
-                ret.triggers.push((trigger, fx));
+                ret.triggers
+                    .insert(trigger, [(p1, t), (p2, t)].into_iter().collect());
             }
         }
 

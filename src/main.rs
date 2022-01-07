@@ -1,5 +1,6 @@
 use std::{collections::HashMap, env, fmt, fs, mem, path::PathBuf};
 
+use image::{ImageBuffer, Rgb};
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 
@@ -9,34 +10,8 @@ use combat_map::CombatMap;
 mod terrain;
 use terrain::TERRAIN;
 
-// TODO: Colorize black differently in triggerable room cells?
-
-// Dungeon corridor
-//
-// ##.......##  C: Center object (ladder etc.)
-// ##.......##  d: Filled with wall if door
-// ##.......##  .: "red grass" in cave/mine, gray hexagon floor (69) in dungeon
-// ##.......##  #: Wall in dungeon, rock wall in mine/cave
-// ##.......##
-// ##d..C..d##  Side walls are shaped according to adjacent dungeon walls.
-// ##.......##
-// ##.......##  Grate tile for pit in floor.
-// ##.......##
-// ##.......##
-// ##.......##
-//
-//
-// ##.......##
-// ###.....###  Seems like a door to the north can show up like this ingame.
-// ...........  Might take artistic liberties with this since the door tile
-// ...........  is still a full dungeon chunk.
-// ...........
-// ...........
-// ...........
-// ...........
-// ...........
-// ##.......##
-// ##.......##
+// If true highlight trigger and target cells in combat rooms.
+const SHOW_SECRETS: bool = false;
 
 lazy_static! {
     static ref U5_PATH: PathBuf = {
@@ -53,18 +28,96 @@ lazy_static! {
     };
 }
 
+// EGA color palette.
+const EGA: [Rgb<u8>; 16] = [
+    Rgb([0x00, 0x00, 0x00]),
+    Rgb([0x00, 0x00, 0xAA]),
+    Rgb([0x00, 0xAA, 0x00]),
+    Rgb([0x00, 0xAA, 0xAA]),
+    Rgb([0xAA, 0x00, 0x00]),
+    Rgb([0xAA, 0x00, 0xAA]),
+    Rgb([0xAA, 0x55, 0x00]),
+    Rgb([0xAA, 0xAA, 0xAA]),
+    Rgb([0x55, 0x55, 0x55]),
+    Rgb([0x55, 0x55, 0xFF]),
+    Rgb([0x55, 0xFF, 0x55]),
+    Rgb([0x55, 0xFF, 0xFF]),
+    Rgb([0xFF, 0x55, 0x55]),
+    Rgb([0xFF, 0x55, 0xFF]),
+    Rgb([0xFF, 0xFF, 0x55]),
+    Rgb([0xFF, 0xFF, 0xFF]),
+];
+
+#[derive(Copy, Clone, Debug)]
+pub enum Color {
+    Black = 0,
+    Navy,
+    Green,
+    Teal,
+    Maroon,
+    Purple,
+    Olive,
+    Silver,
+    Gray,
+    Blue,
+    Lime,
+    Aqua,
+    Red,
+    Fuchsia,
+    Yellow,
+    White,
+}
+
+use Color::*;
+
 lazy_static! {
-    static ref TILES: [[[u8; 16]; 16]; 512] = {
-        // TODO: Figure out which tile is used for the dungeon dirt ground
-        // tiles and recolorize it here.
+    static ref TILES: [[[Rgb<u8>; 16]; 16]; 512] = {
+        fn unpack_lzw(mut bytes: &[u8]) -> Vec<u8> {
+            let mut decoder = lzw::Decoder::new(lzw::LsbReader::new(), 8);
+            let mut ret = Vec::new();
+            loop {
+                let (len, unpacked) = decoder.decode_bytes(bytes).unwrap();
+                if len == 0 {
+                    break;
+                }
+                ret.extend_from_slice(unpacked);
+                bytes = &bytes[len..];
+            }
+            ret
+        }
 
         // First four bytes are expected output length, skip those.
         let tiles =
             unpack_lzw(&fs::read(U5_PATH.join("TILES.16")).unwrap()[4..]);
-        let tiles: Vec<u8> =
+
+        // Expand two 16-color pixels in each byte.
+        let mut tiles: Vec<u8> =
             tiles.into_iter().flat_map(|b| [b >> 4, b & 0xf]).collect();
+
+        // Recolor grass (tile 5) to red cave floor.
+        for i in 5*256..6*256 {
+            if tiles[i] == Green as u8 {
+                tiles[i] = Maroon as u8;
+            }
+        }
+
+        // Splice up (200) and down (201) ladders into an up/down ladder in
+        // one of the nearby junk tiles (204).
+        for i in 0..256 {
+            // Top from up ladder
+            if i < 128 {
+                tiles[204*256 + i] = tiles[200*256 + i];
+            } else {
+                tiles[204*256 + i] = tiles[201*256 + i];
+            }
+        }
+
+        // Convert to Rgb values.
+        let tiles: Vec<Rgb<u8>> =
+            tiles.into_iter().map(|b| EGA[b as usize]).collect();
+
         assert_eq!(tiles.len(), 16 * 16 * 512);
-        let mut ret = [[[0; 16]; 16]; 512];
+        let mut ret = [[[Rgb([0, 0, 0]); 16]; 16]; 512];
         for (i, b) in tiles.into_iter().enumerate() {
             ret[i / 256][(i / 16) % 16][i % 16] = b;
         }
@@ -110,23 +163,9 @@ lazy_static! {
     };
 }
 
-fn unpack_lzw(mut bytes: &[u8]) -> Vec<u8> {
-    let mut decoder = lzw::Decoder::new(lzw::LsbReader::new(), 8);
-    let mut ret = Vec::new();
-    loop {
-        let (len, unpacked) = decoder.decode_bytes(bytes).unwrap();
-        if len == 0 {
-            break;
-        }
-        ret.extend_from_slice(unpacked);
-        bytes = &bytes[len..];
-    }
-    ret
-}
-
 #[derive(Copy, Clone, Debug, Serialize, Deserialize)]
 #[serde(from = "u8")]
-pub enum DungeonTile {
+pub enum DungeonBlock {
     Corridor,
     UpLadder,
     DownLadder,
@@ -151,9 +190,9 @@ pub enum DungeonTile {
     Unknown,
 }
 
-impl fmt::Display for DungeonTile {
+impl fmt::Display for DungeonBlock {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use DungeonTile::*;
+        use DungeonBlock::*;
 
         let c = match self {
             Corridor => '.',
@@ -175,9 +214,9 @@ impl fmt::Display for DungeonTile {
     }
 }
 
-impl From<u8> for DungeonTile {
+impl From<u8> for DungeonBlock {
     fn from(b: u8) -> Self {
-        use DungeonTile::*;
+        use DungeonBlock::*;
 
         match b >> 4 {
             0 => Corridor,
@@ -201,7 +240,7 @@ impl From<u8> for DungeonTile {
 }
 
 #[derive(Copy, Clone, Serialize, Deserialize)]
-struct DungeonFloor([[DungeonTile; 8]; 8]);
+struct DungeonFloor([[DungeonBlock; 8]; 8]);
 
 impl fmt::Display for DungeonFloor {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -222,6 +261,22 @@ enum DungeonKind {
     Prison,
 }
 
+impl DungeonKind {
+    fn wall_tile(self) -> usize {
+        match self {
+            DungeonKind::Prison => 79,
+            _ => 77,
+        }
+    }
+
+    fn floor_tile(self) -> usize {
+        match self {
+            DungeonKind::Prison => 69,
+            _ => 5, // TODO: See battlemaps to figure out if this is right
+        }
+    }
+}
+
 #[derive(Clone)]
 struct Dungeon {
     pub kind: DungeonKind,
@@ -229,14 +284,196 @@ struct Dungeon {
     pub rooms: Vec<CombatMap>,
 }
 
-// TODO: Pixel sampler for dungeon floors, needs Dungeon struct for context.
+#[derive(Default)]
+struct TileData {
+    pub tile: usize,
+    pub monster: Option<usize>,
+    pub is_trigger: bool,
+    pub is_target: bool,
+}
+
+impl Dungeon {
+    pub fn tile(&self, x: i32, y: i32, z: i32) -> TileData {
+        const DARNKNESS_TILE: usize = 255;
+        use DungeonBlock::*;
+
+        if z < 0 || z >= 8 {
+            return Default::default();
+        }
+
+        if x < 0 || x >= 11 * 8 || y < 0 || y >= 11 * 8 {
+            return Default::default();
+        }
+
+        // Which dungeon block is this?
+        let (block_x, block_y) = ((x / 11) as usize, (y / 11) as usize);
+
+        // Position within block.
+        let (x, y) = ((x % 11) as u8, (y % 11) as u8);
+
+        let block = self.floors[z as usize].0[block_y][block_x];
+
+        if let Room(n) = block {
+            let room = &self.rooms[n as usize];
+            let tile = room.area[y as usize][x as usize] as usize;
+
+            let monster = room.monsters.get(&[x, y]).cloned();
+            let is_trigger = room.triggers.contains_key(&[x, y]);
+            let is_target =
+                room.triggers.iter().any(|(_, fx)| fx.contains_key(&[x, y]));
+
+            return TileData {
+                tile,
+                monster,
+                is_trigger,
+                is_target,
+            };
+        }
+
+        if matches!(block, Wall) {
+            return TileData {
+                tile: DARNKNESS_TILE,
+                ..Default::default()
+            };
+        }
+
+        let (n, e, w, s) = (
+            self.floors[z as usize].0[(block_y + 7) % 8][block_x],
+            self.floors[z as usize].0[block_y][(block_x + 1) % 8],
+            self.floors[z as usize].0[block_y][(block_x + 7) % 8],
+            self.floors[z as usize].0[(block_y + 1) % 8][block_x],
+        );
+
+        // Distances from edges.
+        let dw = x;
+        let de = 10 - x;
+        let dn = y;
+        let ds = 10 - y;
+
+        let vert_min = dn.min(ds);
+        let horz_min = de.min(dw);
+
+        // Edge walls.
+        if (matches!(n, Wall) && dn == 0)
+            || (matches!(e, Wall) && de == 0)
+            || (matches!(w, Wall) && dw == 0)
+            || (matches!(s, Wall) && ds == 0)
+        {
+            return TileData {
+                tile: DARNKNESS_TILE,
+                ..Default::default()
+            };
+        }
+
+        if (matches!(n, Wall) && dn == 1)
+            || (matches!(e, Wall) && de == 1)
+            || (matches!(w, Wall) && dw == 1)
+            || (matches!(s, Wall) && ds == 1)
+        {
+            return TileData {
+                tile: self.kind.wall_tile(),
+                ..Default::default()
+            };
+        }
+
+        // Doorways to rooms.
+
+        // FIXME: This fails to align with rooms in Destard.
+        // A fancier version could examine room map and align to open terrain
+        // in it.
+        if (matches!(n, Room(_)) && dn == 0 && de != 5)
+            || (matches!(e, Room(_)) && de == 0 && dn != 5)
+            || (matches!(w, Room(_)) && dw == 0 && dn != 5)
+            || (matches!(s, Room(_)) && ds == 0 && de != 5)
+        {
+            return TileData {
+                tile: self.kind.wall_tile(),
+                ..Default::default()
+            };
+        }
+
+        // Corners.
+        if vert_min.max(horz_min) == 0 {
+            return TileData {
+                tile: DARNKNESS_TILE,
+                ..Default::default()
+            };
+        }
+
+        if vert_min.max(horz_min) == 1 {
+            return TileData {
+                tile: self.kind.wall_tile(),
+                ..Default::default()
+            };
+        }
+
+        let mut tile = self.kind.floor_tile();
+
+        // Center feature.
+        if x == 5 && y == 5 {
+            match block {
+                UpLadder => tile = 200,
+                DownLadder => tile = 201,
+                // XXX: Need to use the hacked tile.
+                UpDownLadder => tile = 204,
+                Chest(_) => tile = 257,
+                OpenChest => tile = 257,
+                Fountain(_) => tile = 216,
+                Trap(_) => tile = 140,
+                _ => {}
+            }
+        }
+
+        // TODO: show fields and doors as blocks
+        return TileData {
+            tile,
+            ..Default::default()
+        };
+    }
+
+    pub fn pixel(&self, x: u32, y: u32, z: i32) -> Rgb<u8> {
+        let (tile_x, tile_y) =
+            (x.div_euclid(16) as i32, y.div_euclid(16) as i32);
+        let (x, y) = (x.rem_euclid(16), y.rem_euclid(16));
+
+        let data = self.tile(tile_x, tile_y, z);
+        if data.tile == 0 {
+            return EGA[0];
+        }
+
+        let tile_idx = data.monster.unwrap_or(data.tile);
+        let mut pixel = TILES[tile_idx][y as usize][x as usize];
+
+        // Highlight trap tiles.
+        if pixel == EGA[Black as usize] && SHOW_SECRETS {
+            if data.is_trigger && data.is_target {
+                pixel = EGA[Olive as usize];
+            } else if data.is_trigger {
+                pixel = EGA[Green as usize];
+            } else if data.is_target {
+                pixel = EGA[Maroon as usize];
+            }
+        }
+
+        pixel
+    }
+
+    pub fn draw_level_map(&self, level: i32) -> ImageBuffer<Rgb<u8>, Vec<u8>> {
+        assert!(level >= 0 && level < 8);
+        image::ImageBuffer::from_fn(8 * 11 * 16, 8 * 11 * 16, |x, y| {
+            self.pixel(x, y, level)
+        })
+    }
+}
 
 fn main() {
-    for (name, dungeon) in DUNGEONS.iter() {
-        println!("{}", name);
-
-        for i in 0..8 {
-            println!("{}", dungeon.floors[i]);
+    for (name, dungeon) in &*DUNGEONS {
+        for z in 0..8 {
+            let map = dungeon.draw_level_map(z);
+            let filename =
+                format!("/tmp/{}-{}.png", name.to_lowercase(), z + 1);
+            eprintln!("{}", filename);
+            map.save(filename).unwrap();
         }
     }
 }
