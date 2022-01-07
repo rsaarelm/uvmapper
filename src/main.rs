@@ -1,4 +1,4 @@
-use std::{env, fmt, fs, mem, path::PathBuf};
+use std::{collections::HashMap, env, fmt, fs, mem, path::PathBuf};
 
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
@@ -73,9 +73,19 @@ lazy_static! {
 }
 
 lazy_static! {
-    // TODO: Figure out the order of the names, make this HashMap<String,
-    // Dungeon>.
-    static ref DUNGEONS: Vec<Dungeon> = {
+    static ref DUNGEONS: HashMap<&'static str, Dungeon> = {
+        use DungeonKind::*;
+        const DUNGEON_DATA: [(&'static str, DungeonKind); 8] = [
+            ("Deceit", Prison),
+            ("Despise", Cave),
+            ("Destard", Cave),
+            ("Wrong", Prison),
+            ("Covetous", Prison),
+            ("Shame", Mine),
+            ("Hythloth", Mine),
+            ("Doom", Cave),
+        ];
+
         let dungeon_combat = fs::read(U5_PATH.join("DUNGEON.CBT")).unwrap();
         let mut rooms: Vec<CombatMap> = dungeon_combat.chunks(mem::size_of::<combat_map::CombatMapRaw>()).map(|c| bincode::deserialize(c).unwrap()).collect();
 
@@ -87,9 +97,10 @@ lazy_static! {
         let dungeons: [[DungeonFloor; 8]; 8] =
             bincode::deserialize(&dungeons).unwrap();
 
-        let mut ret = Vec::new();
-        for (d, r) in dungeons.into_iter().zip(rooms.chunks(16)) {
-            ret.push(Dungeon {
+        let mut ret = HashMap::new();
+        for ((d, r), (name, kind)) in dungeons.into_iter().zip(rooms.chunks(16)).zip(DUNGEON_DATA) {
+            ret.insert(name, Dungeon {
+                kind,
                 floors: d.into_iter().collect(),
                 rooms: r.iter().cloned().collect(),
             });
@@ -204,8 +215,16 @@ impl fmt::Display for DungeonFloor {
     }
 }
 
+#[derive(Copy, Clone, Debug)]
+enum DungeonKind {
+    Cave,
+    Mine,
+    Prison,
+}
+
 #[derive(Clone)]
 struct Dungeon {
+    pub kind: DungeonKind,
     pub floors: Vec<DungeonFloor>,
     pub rooms: Vec<CombatMap>,
 }
@@ -213,36 +232,11 @@ struct Dungeon {
 // TODO: Pixel sampler for dungeon floors, needs Dungeon struct for context.
 
 fn main() {
-    let dungeon_combat = fs::read(U5_PATH.join("DUNGEON.CBT")).unwrap();
-    for c in dungeon_combat.chunks(mem::size_of::<combat_map::CombatMapRaw>()) {
-        let map: CombatMap = bincode::deserialize(c).unwrap();
-        println!("{}", map);
-    }
+    for (name, dungeon) in DUNGEONS.iter() {
+        println!("{}", name);
 
-    // 2nd dungeon has no combat rooms, all other ones have 16.
-
-    let dungeons = fs::read(U5_PATH.join("DUNGEON.DAT")).unwrap();
-    let dungeons: [[DungeonFloor; 8]; 8] =
-        bincode::deserialize(&dungeons).unwrap();
-
-    for d in 0..8 {
-        for f in 0..8 {
-            println!("{}", dungeons[d][f]);
-        }
-        println!("--------\n");
-    }
-
-    for t in TILES.iter() {
-        for y in 0..16 {
-            for x in 0..16 {
-                let b = t[y][x];
-                if b == 0 {
-                    print!(" ");
-                } else {
-                    print!("{}", char::from_digit(b as u32, 16).unwrap());
-                }
-            }
-            println!();
+        for i in 0..8 {
+            println!("{}", dungeon.floors[i]);
         }
     }
 }
