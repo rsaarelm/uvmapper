@@ -473,8 +473,7 @@ fn main() {
     for (name, dungeon) in &*DUNGEONS {
         for z in 0..8 {
             let map = dungeon.draw_level_map(z);
-            let filename =
-                format!("{}-{}.png", name.to_lowercase(), z + 1);
+            let filename = format!("{}-{}.png", name.to_lowercase(), z + 1);
             eprintln!("{}", filename);
             map.save(filename).unwrap();
         }
