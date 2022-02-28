@@ -122,6 +122,12 @@ lazy_static! {
             }
         }
 
+        // For some reason, the whirlpool tile is used for skeletons. Rewrite
+        // whirlpool with skeletons.
+        for i in 492*256..496*256 {
+            tiles[i] = tiles[i - 40*256];
+        }
+
         // Convert to Rgb values.
         let tiles: Vec<Rgb<u8>> =
             tiles.into_iter().map(|b| EGA[b as usize]).collect();
