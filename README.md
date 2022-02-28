@@ -11,6 +11,8 @@ Set path to Ultima V game directory with data files in environment variable
 
     ULTIMA_V_PATH=~/Games/Ultima5 cargo run --release
 
+See the [img/ subdirectory](img/) for all generated maps.
+
 ## Example results
 
 ![Covetous lvl 4](img/covetous-4.png)
