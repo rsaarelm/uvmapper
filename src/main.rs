@@ -97,10 +97,17 @@ lazy_static! {
         // The game does some dynamic graphics tricks with the tiles, try to
         // replicate some here.
 
-        // Recolor grass (tile 5) to red cave floor.
-        for i in 5*256..6*256 {
-            if tiles[i] == Green as u8 {
-                tiles[i] = Maroon as u8;
+        // Recolor green grass into red dungeon dirt in all early terrain tiles.
+        for t in 0..128 {
+            // Except for swamp and some indoor decorations that have actual
+            // green.
+            if matches!(t, 4 | 91 | 92 | 93 | 94) {
+                continue;
+            }
+            for i in t*256..(t+1)*256 {
+                if tiles[i] == Green as u8 {
+                    tiles[i] = Maroon as u8;
+                }
             }
         }
 
