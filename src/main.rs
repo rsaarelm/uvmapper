@@ -310,7 +310,7 @@ struct TileData {
 
 impl Dungeon {
     pub fn tile(&self, x: i32, y: i32, z: i32) -> TileData {
-        const DARNKNESS_TILE: usize = 255;
+        const DARKNESS_TILE: usize = 255;
         use DungeonBlock::*;
 
         if z < 0 || z >= 8 {
@@ -348,7 +348,7 @@ impl Dungeon {
 
         if matches!(block, Wall) {
             return TileData {
-                tile: DARNKNESS_TILE,
+                tile: DARKNESS_TILE,
                 ..Default::default()
             };
         }
@@ -376,7 +376,7 @@ impl Dungeon {
             || (matches!(s, Wall) && ds == 0)
         {
             return TileData {
-                tile: DARNKNESS_TILE,
+                tile: DARKNESS_TILE,
                 ..Default::default()
             };
         }
@@ -411,7 +411,7 @@ impl Dungeon {
         // Corners.
         if vert_min.max(horz_min) == 0 {
             return TileData {
-                tile: DARNKNESS_TILE,
+                tile: DARKNESS_TILE,
                 ..Default::default()
             };
         }
