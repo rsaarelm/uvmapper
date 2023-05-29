@@ -27,9 +27,4 @@ Shame level 8
 
 ## TODO
 
-- Show fields and doorways in dungeon blocks.
 - Custom doorway alignment for tricky rooms in Destard.
-- Optional custom offsets for the wraparound dungeon levels so that the
-  room arrangements aren't cut by the wrap.
-- Command-line interface for output directory, showing secret door triggers
-  etc.
