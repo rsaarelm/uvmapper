@@ -180,9 +180,7 @@ pub enum DungeonBlock {
     UpDownLadder,
 
     Chest(u8),
-    // TODO: Trap, status
     Fountain(u8),
-    // TODO: Type
     Trap(u8),
 
     OpenChest,
@@ -277,6 +275,13 @@ impl DungeonKind {
         }
     }
 
+    fn doorway_tile(self) -> usize {
+        match self {
+            DungeonKind::Prison => 184,
+            _ => 5,
+        }
+    }
+
     fn floor_tile(self) -> usize {
         match self {
             DungeonKind::Prison => 69,
@@ -345,11 +350,20 @@ impl Dungeon {
             };
         }
 
+        // Adjacent blocks.
         let (n, e, w, s) = (
             self.floors[z as usize].0[(block_y + 7) % 8][block_x],
             self.floors[z as usize].0[block_y][(block_x + 1) % 8],
             self.floors[z as usize].0[block_y][(block_x + 7) % 8],
             self.floors[z as usize].0[(block_y + 1) % 8][block_x],
+        );
+
+        // Walls in adjacent blocks.
+        let (n_wall, e_wall, w_wall, s_wall) = (
+            matches!(n, Wall),
+            matches!(e, Wall),
+            matches!(w, Wall),
+            matches!(s, Wall),
         );
 
         // Distances from edges.
@@ -362,10 +376,10 @@ impl Dungeon {
         let horz_min = de.min(dw);
 
         // Edge walls.
-        if (matches!(n, Wall) && dn == 0)
-            || (matches!(e, Wall) && de == 0)
-            || (matches!(w, Wall) && dw == 0)
-            || (matches!(s, Wall) && ds == 0)
+        if (n_wall && dn == 0)
+            || (e_wall && de == 0)
+            || (w_wall && dw == 0)
+            || (s_wall && ds == 0)
         {
             return TileData {
                 tile: DARKNESS_TILE,
@@ -373,16 +387,25 @@ impl Dungeon {
             };
         }
 
-        if (matches!(n, Wall) && dn == 1)
-            || (matches!(e, Wall) && de == 1)
-            || (matches!(w, Wall) && dw == 1)
-            || (matches!(s, Wall) && ds == 1)
+        if (n_wall && dn == 1)
+            || (e_wall && de == 1)
+            || (w_wall && dw == 1)
+            || (s_wall && ds == 1)
         {
             return TileData {
                 tile: self.kind.wall_tile(),
                 ..Default::default()
             };
         }
+
+        // Center wall for force fields and doors.
+        let is_center_wall =
+            // Center cell, always include
+            (x == 5 && y == 5)
+            // Vertical wall
+            || (n_wall && s_wall && (!e_wall || !w_wall) && x == 5 && (2..9).contains(&y))
+            // Horizontal wall
+            || (w_wall && e_wall && (!n_wall || !s_wall) && y == 5 && (2..9).contains(&x));
 
         // Doorways to rooms.
 
@@ -396,6 +419,18 @@ impl Dungeon {
         {
             return TileData {
                 tile: self.kind.wall_tile(),
+                ..Default::default()
+            };
+        }
+        // Do dungeon-appropriate doors into the rooms.
+        // XXX: Repetitious code
+        if (matches!(n, Room(_)) && dn == 0 && de == 5)
+            || (matches!(e, Room(_)) && de == 0 && dn == 5)
+            || (matches!(w, Room(_)) && dw == 0 && dn == 5)
+            || (matches!(s, Room(_)) && ds == 0 && de == 5)
+        {
+            return TileData {
+                tile: self.kind.doorway_tile(),
                 ..Default::default()
             };
         }
@@ -417,22 +452,36 @@ impl Dungeon {
 
         let mut tile = self.kind.floor_tile();
 
+        // Draw a wall around the door.
+        if matches!(block, Door | SecretDoor) && is_center_wall {
+            tile = self.kind.wall_tile();
+        }
+
         // Center feature.
         if x == 5 && y == 5 {
             match block {
                 UpLadder => tile = 200,
                 DownLadder => tile = 201,
-                // XXX: Need to use the hacked tile.
+                // NB: Using the hacked tile.
                 UpDownLadder => tile = 204,
                 Chest(_) => tile = 257,
                 OpenChest => tile = 257,
                 Fountain(_) => tile = 216,
                 Trap(_) => tile = 140,
+                Door => tile = 184,
+                SecretDoor => tile = 78,
                 _ => {}
             }
         }
 
-        // TODO: show fields and doors as blocks
+        // Force field fills the whole middle area.
+        if let Field(force) = block {
+            let force = force as usize & 0x3;
+            if is_center_wall {
+                tile = 488 + force;
+            }
+        }
+
         TileData {
             tile,
             ..Default::default()
