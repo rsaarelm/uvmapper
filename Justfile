@@ -12,8 +12,8 @@ fmt:
     @cargo fmt --all
 
 # Build all images (must have ULTIMA_V_PATH variable set)
-make-images:
-    @cargo run --release
+make-images *ARGS:
+    @cargo run --release -- {{ARGS}}
     mkdir -p img
     mv *.png img/
     optipng img/*.png

@@ -1,5 +1,6 @@
 use std::{collections::HashMap, env, fmt, fs, mem, path::PathBuf};
 
+use clap::Parser;
 use image::{ImageBuffer, Rgb};
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
@@ -9,9 +10,6 @@ use combat_map::CombatMap;
 
 mod terrain;
 use terrain::TERRAIN;
-
-// If true highlight trigger and target cells in combat rooms.
-const SHOW_SECRETS: bool = false;
 
 lazy_static! {
     static ref U5_PATH: PathBuf = {
@@ -435,13 +433,13 @@ impl Dungeon {
         }
 
         // TODO: show fields and doors as blocks
-        return TileData {
+        TileData {
             tile,
             ..Default::default()
-        };
+        }
     }
 
-    pub fn pixel(&self, x: u32, y: u32, z: i32) -> Rgb<u8> {
+    pub fn pixel(&self, config: &Config, x: u32, y: u32, z: i32) -> Rgb<u8> {
         let (tile_x, tile_y) =
             (x.div_euclid(16) as i32, y.div_euclid(16) as i32);
         let (x, y) = (x.rem_euclid(16), y.rem_euclid(16));
@@ -451,11 +449,16 @@ impl Dungeon {
             return EGA[0];
         }
 
-        let tile_idx = data.monster.unwrap_or(data.tile);
+        let tile_idx = if config.show_monsters {
+            data.monster.unwrap_or(data.tile)
+        } else {
+            data.tile
+        };
+
         let mut pixel = TILES[tile_idx][y as usize][x as usize];
 
         // Highlight trap tiles.
-        if pixel == EGA[Black as usize] && SHOW_SECRETS {
+        if pixel == EGA[Black as usize] && config.show_secrets {
             if data.is_trigger && data.is_target {
                 pixel = EGA[Olive as usize];
             } else if data.is_trigger {
@@ -468,18 +471,48 @@ impl Dungeon {
         pixel
     }
 
-    pub fn draw_level_map(&self, level: i32) -> ImageBuffer<Rgb<u8>, Vec<u8>> {
-        assert!(level >= 0 && level < 8);
+    pub fn draw_level_map(
+        &self,
+        config: &Config,
+        level: i32,
+    ) -> ImageBuffer<Rgb<u8>, Vec<u8>> {
+        assert!((0..8).contains(&level));
         image::ImageBuffer::from_fn(8 * 11 * 16, 8 * 11 * 16, |x, y| {
-            self.pixel(x, y, level)
+            self.pixel(config, x, y, level)
         })
     }
 }
 
+#[derive(Parser, Debug)]
+struct Args {
+    /// Hide monsters in combat rooms.
+    #[arg(long)]
+    hide_monsters: bool,
+    /// Highlight trigger and target tiles in combat rooms.
+    #[arg(long)]
+    show_secrets: bool,
+}
+
+struct Config {
+    show_monsters: bool,
+    show_secrets: bool,
+}
+
+impl From<Args> for Config {
+    fn from(args: Args) -> Self {
+        Config {
+            show_monsters: !args.hide_monsters,
+            show_secrets: args.show_secrets,
+        }
+    }
+}
+
 fn main() {
+    let config = Config::from(Args::parse());
+
     for (name, dungeon) in &*DUNGEONS {
         for z in 0..8 {
-            let map = dungeon.draw_level_map(z);
+            let map = dungeon.draw_level_map(&config, z);
             let filename = format!("{}-{}.png", name.to_lowercase(), z + 1);
             eprintln!("{}", filename);
             map.save(filename).unwrap();
