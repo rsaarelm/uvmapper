@@ -1,4 +1,8 @@
-use std::{collections::HashMap, env, fmt, fs, mem, path::PathBuf};
+use std::{
+    collections::{HashMap, HashSet, VecDeque},
+    env, fmt, fs, mem,
+    path::PathBuf,
+};
 
 use clap::Parser;
 use image::{ImageBuffer, Rgb};
@@ -525,10 +529,140 @@ impl Dungeon {
         config: &Config,
         level: i32,
     ) -> ImageBuffer<Rgb<u8>, Vec<u8>> {
+        const SCREEN_WIDTH: i32 = 176;
+        const SCREEN_HEIGHT: i32 = 176;
+
         assert!((0..8).contains(&level));
-        image::ImageBuffer::from_fn(8 * 11 * 16, 8 * 11 * 16, |x, y| {
-            self.pixel(config, x, y, level)
-        })
+
+        // (x, y) offsets for blocks that get pushed right or down from the
+        // base map. "Ground set" blocks that can stay in the initial map
+        // space are assigned (0, 0).
+        let mut unfolded_blocks = HashMap::new();
+
+        if config.unfold {
+            use DungeonBlock::*;
+            let floor = &self.floors[level as usize].0;
+
+            // Unprocessed ground blocks. (physical_pos, logical_pos)
+            let mut open_ground = VecDeque::new();
+            // Unprocessed wall blocks next to ground. (physical_pos, logical_pos)
+            let mut open_wall = VecDeque::new();
+            // Processed blocks. Only stores physical positions.
+            let mut closed = HashSet::new();
+
+            // Find an open block as the starting point.
+            'find_start: for y in 0..8 {
+                for x in 0..8 {
+                    if !matches!(floor[y][x], Wall) {
+                        let x = x as i32;
+                        let y = y as i32;
+                        open_ground.push_back(((x, y), (x, y)));
+                        break 'find_start;
+                    }
+                }
+            }
+
+            assert!(!open_ground.is_empty());
+
+            'fill_regions: loop {
+                // Fill the current open ground.
+                while let Some(((u, v), (x, y))) = open_ground.pop_front() {
+                    closed.insert((u, v));
+                    unfolded_blocks.insert((x, y), (u, v));
+
+                    for (dx, dy) in [(1, 0), (0, 1), (-1, 0), (0, -1)] {
+                        let (x, y) = (x + dx, y + dy);
+                        let (u, v) =
+                            ((u + dx).rem_euclid(8), (v + dy).rem_euclid(8));
+                        if closed.contains(&(u, v)) {
+                            continue;
+                        }
+                        if matches!(floor[v as usize][u as usize], Wall) {
+                            if !open_wall.contains(&((u, v), (x, y))) {
+                                open_wall.push_back(((u, v), (x, y)));
+                            }
+                        } else {
+                            if !open_ground.contains(&((u, v), (x, y))) {
+                                open_ground.push_back(((u, v), (x, y)));
+                            }
+                        }
+                    }
+                }
+
+                // Find the next region of open ground.
+                while let Some(((u, v), (x, y))) = open_wall.pop_front() {
+                    closed.insert((u, v));
+
+                    for (dx, dy) in [(1, 0), (0, 1), (-1, 0), (0, -1)] {
+                        let (x, y) = (x + dx, y + dy);
+                        let (u, v) =
+                            ((u + dx).rem_euclid(8), (v + dy).rem_euclid(8));
+                        if closed.contains(&(u, v)) {
+                            continue;
+                        }
+                        if matches!(floor[v as usize][u as usize], Wall) {
+                            if !open_wall.contains(&((u, v), (x, y))) {
+                                open_wall.push_back(((u, v), (x, y)));
+                            }
+                        } else {
+                            if !open_ground.contains(&((u, v), (x, y))) {
+                                open_ground.push_back(((u, v), (x, y)));
+                                continue 'fill_regions;
+                            }
+                        }
+                    }
+                }
+
+                // Must have processed the whole map to get here.
+                assert_eq!(closed.len(), 64);
+
+                break;
+            }
+        } else {
+            for y in 0..8 {
+                for x in 0..8 {
+                    unfolded_blocks.insert((x, y), (x, y));
+                }
+            }
+        }
+
+        // Compute map bounds.
+        let (mut x0, mut y0, mut x1, mut y1) =
+            (i32::MAX, i32::MAX, i32::MIN, i32::MIN);
+        for (bx, by) in unfolded_blocks.keys() {
+            let x = (bx) * SCREEN_WIDTH;
+            let y = (by) * SCREEN_HEIGHT;
+
+            x0 = x0.min(x);
+            y0 = y0.min(y);
+            x1 = x1.max(x + SCREEN_WIDTH);
+            y1 = y1.max(y + SCREEN_HEIGHT);
+        }
+
+        image::ImageBuffer::from_fn(
+            (x1 - x0) as u32,
+            (y1 - y0) as u32,
+            |x, y| {
+                let (x, y) = (x as i32, y as i32);
+                // Projected block position.
+                let (bx, by) = (
+                    (x0 + x).div_euclid(SCREEN_WIDTH),
+                    (y0 + y).div_euclid(SCREEN_HEIGHT),
+                );
+
+                if let Some((bx, by)) = unfolded_blocks.get(&(bx, by)) {
+                    self.pixel(
+                        config,
+                        (bx * SCREEN_WIDTH + x.rem_euclid(SCREEN_WIDTH)) as u32,
+                        (by * SCREEN_HEIGHT + y.rem_euclid(SCREEN_HEIGHT))
+                            as u32,
+                        level,
+                    )
+                } else {
+                    EGA[Black as usize]
+                }
+            },
+        )
     }
 }
 
@@ -540,11 +674,15 @@ struct Args {
     /// Highlight trigger and target tiles in combat rooms.
     #[arg(long)]
     show_secrets: bool,
+    /// Show the original 8x8 footprint instead of unfolding the dungeon.
+    #[arg(long)]
+    original_grid: bool,
 }
 
 struct Config {
     show_monsters: bool,
     show_secrets: bool,
+    unfold: bool,
 }
 
 impl From<Args> for Config {
@@ -552,6 +690,7 @@ impl From<Args> for Config {
         Config {
             show_monsters: !args.hide_monsters,
             show_secrets: args.show_secrets,
+            unfold: !args.original_grid,
         }
     }
 }
