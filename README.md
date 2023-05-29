@@ -13,6 +13,8 @@ Set path to Ultima V game directory with data files in environment variable
 
 See the [img/ subdirectory](img/) for all generated maps.
 
+Whirlpool tiles in combat rooms indicate a random monster at that spot.
+
 ## Example results
 
 ![Covetous lvl 4](img/covetous-4.png)
