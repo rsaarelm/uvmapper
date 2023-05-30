@@ -1,48 +1,50 @@
 #[rustfmt::skip]
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
 pub enum Terrain {
-    DeepWater, Water, Shoals, Swamp, Grass, Brush, Desert, HeavyBrush, Trees,
+    DeepWater = 0x01, Water, Shoals, Swamp, Grass, Brush, Desert, HeavyBrush, Trees,
     TropicalForest, Foothills, Mountains, HighPeaks,
 
-    SmallHut, CodexShrine, Keep, Village, Towne, Castle, Cave, Mine, Dungeon,
+    SmallHut = 0x10, CodexShrine, Keep, Village, Towne, Castle, Cave, Mine, Dungeon,
     Shrine, RuinedShrine, Lighthouse, Oasis, Bridge,
 
-    Road, Roof, CrystalSphere, LighthouseLight, HollowStump, PlowedPatch,
+    Road = 0x20, Roof = 0x27, CrystalSphere = 0x29, LighthouseLight, HollowStump, PlowedPatch,
     Crops, Tree, Cactus,
 
-    Gargoyle,
+    Gargoyle = 0x38,
 
-    WoodenPlanks, Codex, Mast, Rail, Cobble, Pillar, Pier, ArrowSlit, Window,
+    WoodenPlanks = 0x40, Codex, Mast, Rail, Cobble, Pillar = 0x46, Pier, ArrowSlit = 0x4A, Window,
     Rocks, StoneWall, SecretDoor, BrickWall,
 
-    Crenellations, Anvil, Spyglass, WindowShelf, PottedPlant, Bookshelf,
-    Guardian,
+    Crenellations = 0x50, Anvil = 0x58, Spyglass, WindowShelf, PottedPlant, Bookshelf,
+    Guardian = 0x5E,
 
-    River,
+    River = 0x60,
 
-    StrangeWall,
+    StrangeWall = 0x70,
 
-    Pendulum, Stocks, Manacles, Grate, Archway, Cannonballs, Grave,
+    Pendulum = 0x80, Stocks = 0x84, Manacles, Grate, Archway, Cannonballs, Grave,
     Gravestone, Rack, Trapdoor, Harpsichord, Guillotine, Lava,
 
-    Chair, Table, MagicDoor, MagicWindowDoor, Portcullis, TableWithFood,
-    Mirror, MirrorReflection, BrokenMirror,
+    Chair = 0x90, Table = 0x94, MagicDoor = 0x96, MagicWindowDoor, Portcullis, TableWithFood,
+    Mirror = 0x9D, MirrorReflection, BrokenMirror,
 
-    Sign, Well, HitchingPost, Logs, Marker, Desk, Barrel, Cask, VanityTable,
-    Pitcher, Carpet, Bed, ChestOfDrawers, EndTable, Footlocker,
+    Sign = 0xA0, Well, HitchingPost, Logs, Marker, Desk, Barrel, Cask, VanityTable,
+    Pitcher, Carpet, Bed, ChestOfDrawers = 0xAD, EndTable, Footlocker,
 
-    Torch, Brazier, Spit, Cannon, Door, LockedDoor, WindowDoor,
+    Torch = 0xB0, Brazier = 0xB2, Spit, Cannon, Door = 0xB8, LockedDoor, WindowDoor,
     LockedWindowDoor, Fireplace, StreetLamp, Candelabrum, Stove,
 
-    Stairs, Ladder, Fence,
+    Stairs = 0xC4, Ladder = 0xC8, Fence = 0xCA,
 
-    Waterfall, Fountain, MoonGate, Flame, CollapsedDungeon,
+    Waterfall = 0xD4, Fountain = 0xD8, MoonGate = 0xDC, Flame = 0xDE, CollapsedDungeon = 0xDF,
 
-    Flagpole, Hourglass, Standard,
+    Flagpole = 0xE0, Hourglass = 0xE8, Standard = 0xEC,
 
-    ProvisionerSign, GovernmentSign, ArmourySign, HealerSign, StableSign,
+    ProvisionerSign = 0xF0, GovernmentSign, ArmourySign, HealerSign, StableSign,
     GuildSign, InnSign, ApothecarySign, ShipwrightSign, GrandfatherClock,
-    Bellows, Wall, Darkness,
+    Bellows = 0xFC, Wall = 0xFE, Darkness,
+
+    Chest = 0x101,
 
     Unknown,
 }

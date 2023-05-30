@@ -13,7 +13,7 @@ mod combat_map;
 use combat_map::CombatMap;
 
 mod terrain;
-use terrain::TERRAIN;
+use terrain::{Terrain, TERRAIN};
 
 lazy_static! {
     static ref U5_PATH: PathBuf = {
@@ -140,7 +140,7 @@ lazy_static! {
 lazy_static! {
     static ref DUNGEONS: HashMap<&'static str, Dungeon> = {
         use DungeonKind::*;
-        const DUNGEON_DATA: [(&'static str, DungeonKind); 8] = [
+        const DUNGEON_DATA: [(&str, DungeonKind); 8] = [
             ("Deceit", Prison),
             ("Despise", Cave),
             ("Destard", Cave),
@@ -167,7 +167,7 @@ lazy_static! {
             ret.insert(name, Dungeon {
                 kind,
                 floors: d.into_iter().collect(),
-                rooms: r.iter().cloned().collect(),
+                rooms: r.to_vec(),
             });
         }
 
@@ -274,22 +274,22 @@ enum DungeonKind {
 impl DungeonKind {
     fn wall_tile(self) -> usize {
         match self {
-            DungeonKind::Prison => 79,
-            _ => 77,
+            DungeonKind::Prison => Terrain::BrickWall as usize,
+            _ => Terrain::StoneWall as usize,
         }
     }
 
     fn doorway_tile(self) -> usize {
         match self {
-            DungeonKind::Prison => 184,
-            _ => 5,
+            DungeonKind::Prison => Terrain::Door as usize,
+            _ => Terrain::Grass as usize,
         }
     }
 
     fn floor_tile(self) -> usize {
         match self {
-            DungeonKind::Prison => 69,
-            _ => 5, // TODO: See battlemaps to figure out if this is right
+            DungeonKind::Prison => Terrain::Cobble as usize + 1,
+            _ => Terrain::Grass as usize,
         }
     }
 }
@@ -464,16 +464,17 @@ impl Dungeon {
         // Center feature.
         if x == 5 && y == 5 {
             match block {
-                UpLadder => tile = 200,
-                DownLadder => tile = 201,
-                // NB: Using the hacked tile.
+                UpLadder => tile = Terrain::Ladder as usize,
+                DownLadder => tile = Terrain::Ladder as usize + 1,
+                // NB: Using a generated tile.
                 UpDownLadder => tile = 204,
-                Chest(_) => tile = 257,
-                OpenChest => tile = 257,
-                Fountain(_) => tile = 216,
-                Trap(_) => tile = 140,
-                Door => tile = 184,
-                SecretDoor => tile = 78,
+                Chest(_) => tile = Terrain::Chest as usize,
+                // Open chests don't seem to show up at all in the initial map data.
+                OpenChest => tile = Terrain::Chest as usize,
+                Fountain(_) => tile = Terrain::Fountain as usize,
+                Trap(_) => tile = Terrain::Trapdoor as usize,
+                Door => tile = Terrain::Door as usize,
+                SecretDoor => tile = Terrain::SecretDoor as usize,
                 _ => {}
             }
         }
