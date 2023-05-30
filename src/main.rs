@@ -479,7 +479,7 @@ impl Dungeon {
             }
         }
 
-        // Force field fills the whole middle area.
+        // Force field.
         if let Field(force) = block {
             let force = force as usize & 0x3;
             if is_center_wall {
