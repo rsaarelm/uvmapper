@@ -534,9 +534,8 @@ impl Dungeon {
 
         assert!((0..8).contains(&level));
 
-        // (x, y) offsets for blocks that get pushed right or down from the
-        // base map. "Ground set" blocks that can stay in the initial map
-        // space are assigned (0, 0).
+        // Mapping from unfolded block space (x, y) to the space of the 8x8
+        // floor data array (u, v).
         let mut unfolded_blocks = HashMap::new();
 
         if config.unfold {
